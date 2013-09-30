@@ -6,11 +6,17 @@ Created on Sep 21, 2013
 
 import os
 import wx
-import sys
-import random
+#import sys
+#import random
 import math
 from numpy import *
 from opengltest import MdCanvas
+
+ATTENUATION_COEFF = 4.6 / 50.0
+SURFACE_IRRADIANCE = 1361
+MAX_IRRADIANCE = 100
+REFLECTION_RATE = 0.05
+GROWTH_CONSTANT = 10
 
 NEIGHBOR_DISTANCE_MULTIPLIER = 2
 POLYP_RADIUS = 2.5
@@ -34,9 +40,6 @@ class CoralPolyp():
         else:
             self.colony = parent.colony
 
-    def bud(self):
-        return
-    
     def scan_neighbors( self ):
         polyp_list = self.colony.polyp_list
         for polyp in polyp_list:
@@ -51,40 +54,147 @@ class CoralPolyp():
     def get_distance(self, c ):
         dist = linalg.norm( self.pos - c.pos )
         return dist
+    
+    def get_depth(self):
+        return self.colony.depth
         
+    def _get_irradiance(self):
+        depth = self.get_depth()
+        vec = self.grow_vector / linalg.norm( self.grow_vector ) 
+        cos_val = vec[2]
+        print cos_val
+
+        radiance_base = SURFACE_IRRADIANCE * math.exp( -1 * ATTENUATION_COEFF * depth ) #Wm-2
+        
+        floor_reflection = radiance_base * REFLECTION_RATE
+        direct_irradiance = radiance_base * cos_val
+        
+        total_irradiance = floor_reflection + direct_irradiance
+        
+        if total_irradiance > MAX_IRRADIANCE:
+            return 1
+        else:
+            return total_irradiance / MAX_IRRADIANCE
+        
+        return 1
+    def get_irradiance( self ):
+        depth = self.get_depth()
+        vec = self.growth_vector / linalg.norm( self.growth_vector ) 
+        cos_val = vec[2]
+    
+        radiance_base = SURFACE_IRRADIANCE * math.exp( -1 * ATTENUATION_COEFF * depth ) #Wm-2
+        
+        floor_reflection = radiance_base * REFLECTION_RATE
+        direct_irradiance = radiance_base * cos_val
+        
+        total_irradiance = floor_reflection + direct_irradiance
+        
+        if total_irradiance > MAX_IRRADIANCE:
+            return 1
+        else:
+            return total_irradiance / MAX_IRRADIANCE
+        
+        return 1
+    
     def grow(self):
-        self.pos += ( self.grow_vector / linalg.norm( self.grow_vector ) )  
+        irradiance = self.get_irradiance()
+        growth_rate = 1 - math.exp( -1.0 * irradiance * GROWTH_CONSTANT ) 
+        
+        self.pos += ( self.growth_vector / linalg.norm( self.growth_vector ) ) * growth_rate
         return
     
-    def has_enough_space(self):
-        if self.prev_polyp:
-            dist = self.get_distance( self.prev_polyp ) 
-            if dist > self.radius * 2:
-                p = CoralPolyp( self )
-                p.pos = ( self.pos + self.prev_polyp.pos ) / 2.0 
-                p.grow_vector = ( self.grow_vector + self.prev_polyp.grow_vector ) / 2.0
-                self.prev_polyp.next_polyp = p
-                p.prev_polyp = self.prev_polyp
-                self.prev_polyp = p
-                p.next_polyp = self
-                self.colony.add_polyp( p )
-        if self.next_polyp:
-            dist = self.get_distance( self.next_polyp )
-            if dist > self.radius * 2:
-                p = CoralPolyp( self )
-                p.pos = ( self.pos + self.next_polyp.pos ) / 2.0 
-                p.grow_vector =  ( self.grow_vector + self.next_polyp.grow_vector ) / 2.0
-                self.next_polyp.prev_polyp = p
-                p.next_polyp = self.next_polyp
-                self.next_polyp = p
-                p.prev_polyp = self
-                self.colony.add_polyp( p )
-            
+    def has_enough_space_2d(self, neighboring_polyp ):
+        dist = self.get_distance( neighboring_polyp ) 
+        if dist > self.radius * 2:
+            return True
         return False
+    
+    def find_bud_loc_2d( self, neighboring_polyp ):
+        v1 = self.growth_vector
+        v2 = neighboring_polyp.growth_vector
+        
+        p1 = self.pos
+        p2 = neighboring_polyp.pos
+        a1 = -1 * v1[2]
+        b1 = v1[0]
+        c1 = a1 * p1[0] + b1 * p1[2]
+        a2 = -1 * v2[2]
+        b2 = v2[0]
+        c2 = a2 * p2[0] + b2 * p2[2]
+        
+        arr_a = array( [ [a1, b1], [a2, b2]] )
+        arr_b = array( [ c1, c2 ] )
+        arr_x = linalg.solve( arr_a, arr_b )
+        
+        center = array( [ arr_x[0], 0, arr_x[1] ], float)
+
+        #print p1, p2, "center:", center
+        #radius = linalg.norm( p1 - center )
+        radius = ( linalg.norm( p1 - center ) + linalg.norm( p2 - center ) ) / 2
+        vec = ( ( p1 - center ) + ( p2 - center ) ) / 2
+        new_loc = center + ( vec / linalg.norm( vec ) )  * radius
+        print p1, p2, new_loc #"center:", center, "new:", new_loc
+        return new_loc
+    
+    def bud_2d( self, neighboring_polyp ):
+
+        p = CoralPolyp( self )
+        p.growth_vector = ( self.growth_vector + neighboring_polyp.growth_vector ) / 2.0
+        #p.pos = ( self.pos + neighboring_polyp.pos ) / 2 #
+        p.pos = self.find_bud_loc_2d( neighboring_polyp )  
+        
+        if self.prev_polyp == neighboring_polyp:
+            neighboring_polyp.next_polyp = p
+            p.prev_polyp = neighboring_polyp
+            self.prev_polyp = p
+            p.next_polyp = self
+        else:
+            neighboring_polyp.prev_polyp = p
+            p.next_polyp = neighboring_polyp
+            self.next_polyp = p
+            p.prev_polyp = self
+
+        self.colony.add_polyp( p )            
+        
+        return
+
+    def grow_laterally(self):
+        if self.next_polyp: # head
+            p = CoralPolyp( self )
+            p.next_polyp = self
+            self.prev_polyp = p
+            self.colony.head_polyp = p
+            e = self.get_lower_edge_2d()
+            if e[2] < self.radius * 2:
+                z = e[2] / 2
+                x = math.sqrt( e[2] ** 2 + ( self.radius * 2 ) ** 2 ) / 2
+                p.pos = array( [ x, 0, z ], float )
+                temp_vec = p.pos - e
+                p.growth_vector = array( [ -1 * temp_vec[2], 0, temp_vec[0] ], float ) 
+                p.growth_vector = ( self.growth_vector + array( [ -1, 0, 0 ], float ) ) / 2
+            else:
+                pass
+                #p.pos = array( [ , , ], float )
+    
+    def get_edge_2d(self):
+        center = self.pos
+        vec = self.growth_vector
+        lateral_vec = array( [ vec[2] * -1, 0, vec[1] ], float )
+        lateral_vec_u = lateral_vec / linalg.norm( lateral_vec )
+        edge1 = center + lateral_vec_u * self.radius * 0.5
+        edge2 = center - lateral_vec_u * self.radius * 0.5
+        return ( edge1, edge2 )
+    
+    def get_lower_edge_2d(self):
+        (e1,e2) = self.get_edge_2d()
+        if e1[2] < e2[2]:
+            return e1
+        else:
+            return e2    
     def to_string(self):
         ret_str = ""
         ret_str += "[" + ", ".join( [ str( int( x * 10 ) / 10.0 ) for x in self.pos ] ) + "] / "
-        ret_str += "[" + ", ".join( [ str( int( x * 10 ) / 10.0 ) for x in self.grow_vector ] ) + "]\n"
+        ret_str += "[" + ", ".join( [ str( int( x * 10 ) / 10.0 ) for x in self.growth_vector ] ) + "]\n"
         return ret_str
     
 class CoralColony():
@@ -102,10 +212,23 @@ class CoralColony():
         return
     
     def grow(self):
+        #p = self.head_polyp
         for p in self.polyp_list:
             p.grow()
-            if p.has_enough_space():
-                p.bud()
+
+        n_polyp1 = len( self.polyp_list )
+        for p in self.polyp_list:
+            #print p.id, p.pos, len( self.polyp_list )
+            if p.prev_polyp:
+                if p.has_enough_space_2d( p.prev_polyp ):
+                    p.bud_2d( p.prev_polyp )
+            if p.next_polyp:
+                if p.has_enough_space_2d( p.next_polyp ):
+                    p.bud_2d( p.next_polyp )
+        n_polyp2 = len( self.polyp_list )
+        growth_rate = float( n_polyp2 - n_polyp1 ) / float( n_polyp1 )
+        if growth_rate < 0.01:
+            self.head_polyp.grow_laterally()
         return
 
     def init_neighbor_2d(self):
@@ -114,6 +237,7 @@ class CoralColony():
             self.polyp_list[i+1].prev_polyp = self.polyp_list[i]
         self.head_polyp = self.polyp_list[0]
         self.tail_polyp = self.polyp_list[len(self.polyp_list)-1]
+        
     def to_string(self):
         ret_str = ""
         p = self.head_polyp
@@ -122,28 +246,48 @@ class CoralColony():
             p = p.next_polyp
             ret_str += p.to_string()
         return ret_str
-        
 
-colony = CoralColony()
-x_pos = [ -4.5, 0, 4.5 ]
-y_pos = [ 0, 0, 0 ]
-z_pos = [ 1.5, 3, 1.5 ]
-grow_vector = [ array( [ -3, 0, 4 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 3, 0, 4 ], float ) ]
+    def print_to_image(self, img ):
+        (w,h) = img.size
+        origin = [ w / 2, h - 10 ]
+        print "num polyps", len( self.polyp_list )
+        for p in self.polyp_list:
+            #print p.pos
+            img.putpixel( ( origin[0] + int( p.pos[0] ),  origin[1] - int( p.pos[2] ) ), ( 0,0,0 ) )
 
 
-for i in xrange( 3 ):
-    p = CoralPolyp( colony, pos = array( [ x_pos[i], y_pos[i], z_pos[i] ], float ) )
-    p.grow_vector = grow_vector[i]
-    colony.add_polyp( p )
+for d in [ 1, 20, 50 ]:
 
-colony.init_neighbor_2d()
-#print len( colony.polyp_list )
-#print colony.to_string()
-
-for i in xrange( 100 ):
-    print len( colony.polyp_list )
-    colony.grow()
+    colony = CoralColony( depth = d )
+    x_pos = [ -4.5, 0, 4.5 ]
+    y_pos = [ 0, 0, 0 ]
+    z_pos = [ 1.5, 4, 1.5 ]
+    grow_vector = [ array( [ -3, 0, 4 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 3, 0, 4 ], float ) ]
+    
+    
+    for i in xrange( 3 ):
+        p = CoralPolyp( colony, pos = array( [ x_pos[i], y_pos[i], z_pos[i] ], float ) )
+        p.growth_vector = grow_vector[i]
+        colony.add_polyp( p )
+    
+    colony.init_neighbor_2d()
+    #print len( colony.polyp_list )
     #print colony.to_string()
+    import Image
+    image = Image.new( "RGB", ( 1024, 1024 ), "white" ) 
+    
+    for i in xrange( 100 ):
+            
+        print "iter:",  i, "len:", len( colony.polyp_list ) #colony.to_string()
+        colony.grow()
+        print "iter:",  i, "len:", len( colony.polyp_list ) #colony.to_string()
+        if i % 12 == 0:
+            #print "iter:",  i, "len:", len( colony.polyp_list ) #colony.to_string()
+            #pass
+            colony.print_to_image( image )
+    
+    image.save( "colony_" + str( d ) + ".png" )
+        #print colony.to_string()
 
 
 ID_CORALLITE_LISTCTRL = 1001
