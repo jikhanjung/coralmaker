@@ -11,6 +11,7 @@ import wx
 import math
 from numpy import *
 from opengltest import MdCanvas
+import Image, ImageDraw
 
 ATTENUATION_COEFF = 4.6 / 50.0
 SURFACE_IRRADIANCE = 1361
@@ -179,10 +180,10 @@ class CoralPolyp():
     def get_edge_2d(self):
         center = self.pos
         vec = self.growth_vector
-        lateral_vec = array( [ vec[2] * -1, 0, vec[1] ], float )
+        lateral_vec = array( [ vec[2] * -1, 0, vec[0] ], float )
         lateral_vec_u = lateral_vec / linalg.norm( lateral_vec )
-        edge1 = center + lateral_vec_u * self.radius * 0.5
-        edge2 = center - lateral_vec_u * self.radius * 0.5
+        edge1 = center + lateral_vec_u * self.radius
+        edge2 = center - lateral_vec_u * self.radius
         return ( edge1, edge2 )
     
     def get_lower_edge_2d(self):
@@ -196,6 +197,17 @@ class CoralPolyp():
         ret_str += "[" + ", ".join( [ str( int( x * 10 ) / 10.0 ) for x in self.pos ] ) + "] / "
         ret_str += "[" + ", ".join( [ str( int( x * 10 ) / 10.0 ) for x in self.growth_vector ] ) + "]\n"
         return ret_str
+
+    def print_to_image(self, img, origin, color = "black"):
+        imgdr = ImageDraw.Draw( img )
+        (e1, e2) = self.get_edge_2d()
+        arr = []
+        for e in [ e1, e2 ]:
+            arr.append( round( e[0] ) + origin[0] )
+            arr.append( round( e[2] ) * -1 + origin[1] )
+        #arr = [ e1[0], e1[2], e2[0], e2[2] ]
+        imgdr.line( arr, fill = color )
+        #img.putpixel( ( origin[0] + int( self.pos[0] ),  origin[1] - int( self.pos[2] ) ), ( 0,0,0 ) )
     
 class CoralColony():
     def __init__(self, depth = 1 ):
@@ -227,8 +239,8 @@ class CoralColony():
                     p.bud_2d( p.next_polyp )
         n_polyp2 = len( self.polyp_list )
         growth_rate = float( n_polyp2 - n_polyp1 ) / float( n_polyp1 )
-        if growth_rate < 0.01:
-            self.head_polyp.grow_laterally()
+        #if growth_rate < 0.01:
+            #self.head_polyp.grow_laterally()
         return
 
     def init_neighbor_2d(self):
@@ -252,8 +264,11 @@ class CoralColony():
         origin = [ w / 2, h - 10 ]
         print "num polyps", len( self.polyp_list )
         for p in self.polyp_list:
+            color = "red"
+            if p == self.head_polyp or p == self.tail_polyp: 
+                color = "black"
+            p.print_to_image( img, origin, color )
             #print p.pos
-            img.putpixel( ( origin[0] + int( p.pos[0] ),  origin[1] - int( p.pos[2] ) ), ( 0,0,0 ) )
 
 
 for d in [ 1, 20, 50 ]:
@@ -273,7 +288,6 @@ for d in [ 1, 20, 50 ]:
     colony.init_neighbor_2d()
     #print len( colony.polyp_list )
     #print colony.to_string()
-    import Image
     image = Image.new( "RGB", ( 1024, 1024 ), "white" ) 
     
     for i in xrange( 100 ):
