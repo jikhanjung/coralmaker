@@ -233,12 +233,12 @@ class CoralPolyp():
         if e[2] < self.radius * 2:
             print "aa"
             z = e[2] / 2
-            
-            x = e[0] + ( math.sqrt(  ( self.radius * 2 ) ** 2 - e[2] ** 2) / 2 ) * ( e[0] / abs( e[0] ) )
+            sign = ( e[0] / abs( e[0] ) )
+            x = e[0] + ( math.sqrt(  ( self.radius * 2 ) ** 2 - e[2] ** 2) / 2 ) * sign 
             p.pos = array( [ x, 0, z ], float )
-            temp_vec = p.pos - e
-            p.growth_vector = array( [ -1 * temp_vec[2], 0, temp_vec[0] ], float ) 
-            p.growth_vector = ( self.growth_vector + array( [ -1, 0, 0 ], float ) ) / 2
+            #temp_vec = p.pos - e
+            #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
+            p.growth_vector = ( self.growth_vector + array( [ sign, 0, 0 ], float ) ) / 2
         else:
             print "bb"
             center = p1.get_local_center(p2)
