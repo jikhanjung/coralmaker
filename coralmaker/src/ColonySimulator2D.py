@@ -9,22 +9,24 @@ Y_INDEX = 1
 Z_INDEX = 2
 import os
 import wx
-#import sys
+import sys
 #import random
 import math
 from numpy import *
 from opengltest import MdCanvas
 import Image, ImageDraw
 
-ATTENUATION_COEFF = 4.6 / 50.0
+ATTENUATION_COEFFICIENT = 4.6 / 50.0
 SURFACE_IRRADIANCE = 1361
 MAX_IRRADIANCE = 100
 REFLECTION_RATE = 0.05
 GROWTH_CONSTANT = 10
-
+LATERAL_GROWTH_PERIOD = 12
+LATERAL_GROWTH_CRITERION = 0.1
 NEIGHBOR_DISTANCE_MULTIPLIER = 2
 POLYP_RADIUS = 2.5
-
+DEPTH = 1
+ZOOM = 1.0
 class CoralPolyp():
     def __init__(self, parent, pid=-1, pos = array( [0,0,0], float ), radius = POLYP_RADIUS, height = 1 ):
         self.id = pid
@@ -71,17 +73,17 @@ class CoralPolyp():
         cos_val = vec[Z_INDEX]
         print cos_val
 
-        radiance_base = SURFACE_IRRADIANCE * math.exp( -1 * ATTENUATION_COEFF * depth ) #Wm-2
+        radiance_base = self.config['surface_irradiance'] * math.exp( -1 * self.config['attenuation_coefficient'] * depth ) #Wm-2
         
-        floor_reflection = radiance_base * REFLECTION_RATE
+        floor_reflection = radiance_base * self.config['reflection_rate']
         direct_irradiance = radiance_base * cos_val
         
         total_irradiance = floor_reflection + direct_irradiance
         
-        if total_irradiance > MAX_IRRADIANCE:
+        if total_irradiance > self.config['max_irradiance']:
             return 1
         else:
-            return total_irradiance / MAX_IRRADIANCE
+            return total_irradiance / self.config['max_irradiance']
         
         return 1
     def get_irradiance( self ):
@@ -89,23 +91,23 @@ class CoralPolyp():
         vec = self.growth_vector / linalg.norm( self.growth_vector ) 
         cos_val = vec[Z_INDEX]
     
-        radiance_base = SURFACE_IRRADIANCE * math.exp( -1 * ATTENUATION_COEFF * depth ) #Wm-2
+        radiance_base = self.colony.config['surface_irradiance'] * math.exp( -1 * self.colony.config['attenuation_coefficient'] * depth ) #Wm-2
         
-        floor_reflection = radiance_base * REFLECTION_RATE
+        floor_reflection = radiance_base * self.colony.config['reflection_rate']
         direct_irradiance = radiance_base * cos_val
         
         total_irradiance = floor_reflection + direct_irradiance
         
-        if total_irradiance > MAX_IRRADIANCE:
+        if total_irradiance > self.colony.config['max_irradiance']:
             return 1
         else:
-            return total_irradiance / MAX_IRRADIANCE
+            return total_irradiance / self.colony.config['max_irradiance']
         
         return 1
     
     def grow(self):
         irradiance = self.get_irradiance()
-        growth_rate = 1 - math.exp( -1.0 * irradiance * GROWTH_CONSTANT ) 
+        growth_rate = 1 - math.exp( -1.0 * irradiance * self.colony.config['growth_constant'] ) 
         
         self.pos += ( self.growth_vector / linalg.norm( self.growth_vector ) ) * growth_rate
         self.age_in_month += 1
@@ -294,14 +296,14 @@ class CoralPolyp():
         if self.next_polyp:
             arr = []
             for p in [ self.pos, self.next_polyp.pos ]:
-                arr.append( round( p[X_INDEX] ) + origin[0] )
-                arr.append( round( p[Z_INDEX] ) * -1 + origin[1] )
+                arr.append( round( p[X_INDEX] * self.colony.config['zoom'] ) + origin[0] )
+                arr.append( round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
             imgdr.line( arr, fill = color )
 
         arr = []
         for p in [ self.pos, self.prev_pos ]:
-            arr.append( round( p[X_INDEX] ) + origin[0] )
-            arr.append( round( p[Z_INDEX] ) * -1 + origin[1] )
+            arr.append( round( p[X_INDEX] * self.colony.config['zoom'] ) + origin[0] )
+            arr.append( round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
         #imgdr.line( arr, fill = color )
         #print "pos:", self.prev_pos, self.pos
         self.prev_pos_list.append( self.prev_pos[:] )
@@ -309,6 +311,34 @@ class CoralPolyp():
         
         return
     
+    def print_to_dc(self, dc, origin, color = "black"):
+
+        #dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
+        dc.Clear()
+        dw, dh = dc.GetSize()
+
+        dc.SetPen(wx.Pen("black", 1))
+
+        if self.next_polyp:
+            arr = []
+            x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+            y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+            x2 = round( self.next_polyp.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+            y2 = round( self.next_polyp.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+
+            dc.DrawLine( x1, y1, x2, y2 )
+
+        x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+        y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+        x2 = round( self.prev_pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+        y2 = round( self.prev_pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+        #dc.DrawLine( x1, y1, x2, y2 )
+        
+        self.prev_pos_list.append( self.prev_pos[:] )
+        self.prev_pos[:] = self.pos[:]
+        
+        return
+
 
 
 class CoralColony():
@@ -320,7 +350,7 @@ class CoralColony():
         self.month = 0
         self.prev_polyp_count = 0
         self.lateral_growth_criterion = 0.01
-        self.lateral_growth_check_period = 1 #month
+        self.lateral_growth_period = 1 #month
         return
         
     def add_polyp( self, p ):
@@ -343,7 +373,7 @@ class CoralColony():
         #p = self.head_polyp
         self.month += 1
         #if self.month % 1 == 0:
-        if self.month % self.lateral_growth_check_period == 0:
+        if self.month % self.lateral_growth_period == 0:
             self.lateral_growth_check()
 
         for p in self.polyp_list:
@@ -399,8 +429,17 @@ class CoralColony():
                 color = "black"
             p.print_to_image( img, origin, color )
             #print p.pos
+    def print_to_dc(self, dc ):
+        w,h = dc.GetSize()
+        origin = [ w / 2, h - 10 ]
+        #print "num polyps", len( self.polyp_list )
+        for p in self.polyp_list:
+            color = "red"
+            if p == self.head_polyp or p == self.tail_polyp: 
+                color = "black"
+            p.print_to_dc( dc, origin, color )
 
-
+'''
 for d in [ 1, 20, 50 ]:
 
     print "depth:", d
@@ -435,293 +474,226 @@ for d in [ 1, 20, 50 ]:
     colony.print_to_image( image )
     image.save( "colony_" + str( d ) + ".png" )
         #print colony.to_string()
+'''
 
-
-ID_CORALLITE_LISTCTRL = 1001
+ID_POLYP_LISTCTRL = 1001
 ID_NEIGHBOR_LISTCTRL = 1002
 ID_CHK_SHOW_INDEX = 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
 
-class CoralMakerFrame( wx.Frame ):
+class ColonySimulator2DFrame( wx.Frame ):
     def __init__(self, parent, wid, name ):
         wx.Frame.__init__( self, parent, wid, name, wx.DefaultPosition, wx.Size(1024,768) )
 
         self.colony = CoralColony()
+        
         self.interval = 100
         self.growth_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnTimer, self.growth_timer)
         self.growth_timer.Start(self.interval)
-        self.show_index = False
-    #self.is_growing = True
-    
-        self.control = MdCanvas(self)
-        self.control.SetMinSize((800,600))
-        self.Button1 = wx.Button(self, wx.ID_ANY, 'Play')
-        self.Button2 = wx.Button(self, wx.ID_ANY, 'Reset')
-        self.LoadNeighborButton = wx.Button(self, wx.ID_ANY, 'Watch')
-        self.ButtonExport = wx.Button(self, wx.ID_ANY, 'Export')
-#        lb1 = wx.StaticText(self, wx.ID_ANY, '')
-        lb2 = wx.StaticText(self, wx.ID_ANY, '')
         
-        self.chkShowIndex = wx.CheckBox( self, ID_CHK_SHOW_INDEX, "Show Index" )
-        self.Bind( wx.EVT_CHECKBOX, self.ToggleShowIndex, id=ID_CHK_SHOW_INDEX )
-        self.chkShowIndex.SetValue( self.show_index)  
-        self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
-        self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
-        self.chkEnhanceVerticalGrowth.SetValue( self.show_index)  
+        #self.show_index = False
+        
+        
+        #self.control = MdCanvas(self)
+
+        self.ColonyView = wx.Window( self, -1 )
+        self.ColonyView.SetMinSize((800,600))
+        self.PlayButton = wx.Button(self, wx.ID_ANY, 'Play')
+        self.ResetButton = wx.Button(self, wx.ID_ANY, 'Reset')
+        #self.LoadNeighborButton = wx.Button(self, wx.ID_ANY, 'Watch')
+        #self.ButtonExport = wx.Button(self, wx.ID_ANY, 'Export')
+        #lb1 = wx.StaticText(self, wx.ID_ANY, '')
+        #lb2 = wx.StaticText(self, wx.ID_ANY, '')
+        
+        #self.chkShowIndex = wx.CheckBox( self, ID_CHK_SHOW_INDEX, "Show Index" )
+        #self.Bind( wx.EVT_CHECKBOX, self.ToggleShowIndex, id=ID_CHK_SHOW_INDEX )
+        #self.chkShowIndex.SetValue( self.show_index)  
+        #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
+        #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
+        #self.chkEnhanceVerticalGrowth.SetValue( self.show_index)  
+        self.Bind( wx.EVT_PAINT, self.OnPaint, self.ColonyView )
         
         sizer1 = wx.BoxSizer(wx.HORIZONTAL)
-        sizer1.Add( self.Button1, wx.ALIGN_CENTER   )
-        sizer1.Add( self.Button2, wx.ALIGN_CENTER )
-        sizer1.Add( self.ButtonExport, wx.ALIGN_CENTER )
+        sizer1.Add( self.PlayButton , wx.ALIGN_CENTER   )
+        sizer1.Add( self.ResetButton , wx.ALIGN_CENTER )
+        #sizer1.Add( self.ButtonExport, wx.ALIGN_CENTER )
     
         self.forms = dict()
-        '''    
-        self.neighborDistanceLabel = wx.StaticText(self, -1, 'Neigh. Dist', style=wx.ALIGN_RIGHT)
-        self.forms['neighbor_distance'] = wx.TextCtrl(self, -1, str( NEIGHBOR_DISTANCE_THRESHOLD ) )
-        self.neighborCountLabel = wx.StaticText(self, -1, 'No. Neighbor', style=wx.ALIGN_RIGHT)
-        self.forms['neighbor_count'] = wx.TextCtrl(self, -1, str( NEIGHBOR_COUNT_THRESHOLD ) )
-        self.minDistLabel = wx.StaticText(self, -1, 'Min. Dist', style=wx.ALIGN_RIGHT)
-        self.forms['minimum_distance'] = wx.TextCtrl(self, -1, str( MIN_DISTANCE_FOR_DIVISION ) )
-        self.reproductionLabel = wx.StaticText(self, -1, 'Reproduction rate', style=wx.ALIGN_RIGHT)
-        self.forms['reproduction'] = wx.TextCtrl(self, -1, str( REPRODUCTION_RATE ) )
-        self.elongationLabel = wx.StaticText(self, -1, 'Elongation rate', style=wx.ALIGN_RIGHT)
-        self.forms['elongation'] = wx.TextCtrl(self, -1, str( ELONGATION_RATE ) )
-        self.branchingLabel = wx.StaticText(self, -1, 'Branchingrate', style=wx.ALIGN_RIGHT)
-        self.forms['branching'] = wx.TextCtrl(self, -1, str( BRANCHING_RATE ) )
-        self.away1Label = wx.StaticText(self, -1, 'Away 1', style=wx.ALIGN_RIGHT)
-        self.forms['away1'] = wx.TextCtrl(self, -1, str( AWAY_1 ) )
-        self.away2Label = wx.StaticText(self, -1, 'Away 2', style=wx.ALIGN_RIGHT)
-        self.forms['away2'] = wx.TextCtrl(self, -1, str( AWAY_2 ) )
-        self.coralliteListLabel = wx.StaticText(self, -1, 'Corallite', style=wx.ALIGN_RIGHT)
-        #self.coralliteListButton = wx.Button(self, -1, 'Load list' )
-        self.coralliteList = wx.ListBox( self, ID_CORALLITE_LISTCTRL, choices=(),size=(100,200), style=wx.LB_SINGLE )
-        self.neighborListLabel = wx.StaticText(self, -1, 'Neighbor', style=wx.ALIGN_RIGHT)
-        #self.coralliteListButton = wx.Button(self, -1, 'Load list' )
-        self.neighborList = wx.ListBox( self, ID_NEIGHBOR_LISTCTRL, choices=(),size=(100,200), style=wx.LB_EXTENDED )
-        '''     
-           
+        
+        self.depth_label = wx.StaticText(self, -1, 'Depth', style=wx.ALIGN_RIGHT)
+        self.forms['depth'] = wx.TextCtrl(self, -1, str( DEPTH ) )
+        self.lateral_growth_period_label = wx.StaticText(self, -1, 'Lat. Growth Period', style=wx.ALIGN_RIGHT)
+        self.forms['lateral_growth_period'] = wx.TextCtrl(self, -1, str( LATERAL_GROWTH_PERIOD ) )
+        self.lateral_growth_criterion_label = wx.StaticText(self, -1, 'Lat. Growth Criterion', style=wx.ALIGN_RIGHT)
+        self.forms['lateral_growth_criterion'] = wx.TextCtrl(self, -1, str( LATERAL_GROWTH_CRITERION ) )
+        self.surface_irradiance_label = wx.StaticText(self, -1, 'Surface Irradiance', style=wx.ALIGN_RIGHT)
+        self.forms['surface_irradiance'] = wx.TextCtrl(self, -1, str( SURFACE_IRRADIANCE ) )
+        self.attenuation_coefficient_label = wx.StaticText(self, -1, 'Attenuation Coeff.', style=wx.ALIGN_RIGHT)
+        self.forms['attenuation_coefficient'] = wx.TextCtrl(self, -1, str( ATTENUATION_COEFFICIENT) )
+        self.max_irradiance_label = wx.StaticText(self, -1, 'Max Irradiance', style=wx.ALIGN_RIGHT)
+        self.forms['max_irradiance'] = wx.TextCtrl(self, -1, str( MAX_IRRADIANCE ) )
+        self.reflection_rate_label = wx.StaticText(self, -1, 'Reflection Rate', style=wx.ALIGN_RIGHT)
+        self.forms['reflection_rate'] = wx.TextCtrl(self, -1, str( REFLECTION_RATE ) )
+        self.growth_constant_label = wx.StaticText(self, -1, 'Growth constant', style=wx.ALIGN_RIGHT)
+        self.forms['growth_constant'] = wx.TextCtrl(self, -1, str( GROWTH_CONSTANT ) )
+        self.polyp_radius_label = wx.StaticText(self, -1, 'Polyp radius', style=wx.ALIGN_RIGHT)
+        self.forms['polyp_radius'] = wx.TextCtrl(self, -1, str( POLYP_RADIUS ) )
+        self.zoom_label = wx.StaticText(self, -1, 'Zoom', style=wx.ALIGN_RIGHT)
+        self.forms['zoom'] = wx.TextCtrl(self, -1, str( ZOOM ) )
+        
+        self.polyp_list_label = wx.StaticText(self, -1, 'Polyps', style=wx.ALIGN_RIGHT)
+        self.polyp_listbox = wx.ListBox( self, -1, choices=(),size=(100,200), style=wx.LB_SINGLE )
+
         sizer2 = wx.FlexGridSizer( 3, 3, 0, 0 )
+
+        sizer2.Add( self.depth_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.forms['depth'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.lateral_growth_period_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.chkShowIndex, flag=wx.EXPAND )
+        sizer2.Add( self.forms['lateral_growth_period'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.lateral_growth_criterion_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.forms['lateral_growth_criterion'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.surface_irradiance_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.chkEnhanceVerticalGrowth, flag=wx.EXPAND )
-        sizer2.Add( self.neighborDistanceLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['surface_irradiance'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.attenuation_coefficient_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['neighbor_distance'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.neighborCountLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['attenuation_coefficient'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.max_irradiance_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['neighbor_count'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.minDistLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['max_irradiance'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.reflection_rate_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['minimum_distance'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.reproductionLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['reflection_rate'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.growth_constant_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['reproduction'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.elongationLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['growth_constant'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.polyp_radius_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['elongation'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.branchingLabel, flag=wx.EXPAND )
+        sizer2.Add( self.forms['polyp_radius'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+
+        sizer2.Add( self.zoom_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['branching'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.away1Label, flag=wx.EXPAND )
+        sizer2.Add( self.forms['zoom'], flag=wx.EXPAND | wx.ALIGN_CENTER)
+ 
+        sizer2.Add( self.polyp_list_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['away1'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.away2Label, flag=wx.EXPAND )
-        sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.forms['away2'], flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.coralliteListLabel, flag=wx.EXPAND )
-        sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.coralliteList, flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.LoadNeighborButton, flag=wx.EXPAND | wx.ALIGN_CENTER)
-        sizer2.Add( self.neighborListLabel, flag=wx.EXPAND )
-        sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.neighborList, flag=wx.EXPAND | wx.ALIGN_CENTER)
-    
+        sizer2.Add( self.polyp_listbox, flag=wx.EXPAND | wx.ALIGN_CENTER)
+
         fs = wx.FlexGridSizer(2, 2, 10, 5)
         fs.AddGrowableCol(0)
         fs.AddGrowableCol(1)
         fs.AddGrowableRow(0)
-        fs.Add( self.control, 0, wx.EXPAND )
+        fs.Add( self.ColonyView, 0, wx.EXPAND )
         fs.Add( sizer2, 0, wx.ALIGN_CENTER )
         fs.Add( sizer1, 0, wx.EXPAND )
-        fs.Add( lb2, 0, wx.ALIGN_CENTER )
-        self.Bind( wx.EVT_BUTTON, self.OnButton1, self.Button1  )
-        self.Bind( wx.EVT_BUTTON, self.OnButton2, self.Button2  )
-        self.Bind( wx.EVT_BUTTON, self.OnLoadNeighbor, self.LoadNeighborButton  )
-        self.Bind( wx.EVT_BUTTON, self.OnExport, self.ButtonExport  )
-        #self.Bind( wx.EVT_BUTTON, self.OnLoadList, self.coralliteListButton )
-        self.Bind(wx.EVT_LISTBOX, self.OnCoralliteSelected, id=ID_CORALLITE_LISTCTRL )
+        self.Bind( wx.EVT_BUTTON, self.OnPlay, self.PlayButton)
+        self.Bind( wx.EVT_BUTTON, self.OnReset, self.ResetButton  )
+
+        self.Bind(wx.EVT_LISTBOX, self.OnPolypSelected, self.polyp_listbox )
         self.SetSizer(fs)
-        self.init_control = False
-        self.is_growing = False
-        self.is_watching_corallite = False
         
         self.ResetColony()
+        self.is_growing = False
         #self.control.SetColony( self.colony )
         # self.control.ShowIndex()
-        self.control.BeginAutoRotate(500)
+        #self.control.BeginAutoRotate(500)
+        self.InitBuffer()
 
-    def ToggleShowIndex(self,event):
-        self.show_index = self.chkShowIndex.GetValue()
-        #print self.show_index
-        if( self.show_index ):
-            self.control.ShowIndex()
-        else:
-            self.control.HideIndex()
-    
-    def ToggleEnhanceVerticalGrowth(self,event):
-        self.enhance_vertical_growth = self.chkEnhanceVerticalGrowth.GetValue()
-        self.colony.enhance_vertical_growth = self.enhance_vertical_growth 
-     
-    def OnExport(self,event):
-        result_str = ""
-        actual_str = ""
-        l_count = 0
-        result_str += "3\n"
-        #result_str += str( len( self.colony.corallites) )
-        print "count:", l_count
-        living_corallites = []
-        for c in self.colony.corallites:
-            if c.dead == False:
-                living_corallites.append(c)
-                actual_str += str( c.pos[0] ) + "\t" + str( c.pos[1] ) + "\t" + str( c.pos[2] ) + "\n"
-                l_count += 1
-                print "count:", l_count
-        result_str += str( l_count ) + "\n"
-        result_str += actual_str
-        filename = "colony.dat"
-        fh = file( filename, 'w' )
-        fh.write( result_str )
-        fh.close()
-      
-        os.system( '"qdelaunay Qt s i TO output.dat < colony.dat"')
+    def InitBuffer(self):
+        print "init buffer"
+        w, h = self.ColonyView.GetClientSize()
+        self.buffer = wx.EmptyBitmap(w, h)
+        dc = wx.BufferedDC(wx.ClientDC(self.ColonyView), self.buffer)
+        self.DrawColony(dc)
+
+    def OnSize(self,event):
+        #print "onsize"
+        self.InitBuffer()
+
+    def OnPaint(self, event):
+        print "onpaint"
+        dc = wx.BufferedPaintDC(self, self.buffer)
+
+    def DrawColony(self,dc):
+        #image = Image.new( "RGB", ( 800, 600 ), "white" ) 
+        #image.save( "colony_" + str( self.colony.depth ) + ".png" )
+        #dc = self.ColonyView.
+        self.colony.print_to_dc( dc )
+        #wximg = piltoimage(image)
+        #self.ColonyView.SetBitmap( wximg.ConvertToBitmap())
         
-        f = open( "output.dat", 'r' )
-        data = f.read()
-        f.close()
-        lines = [ l.strip() for l in data.split( "\n") ]
-        header = lines[0]
-        lines = lines[1:]
-        triangles = []
-        dup_triangles = []
-        for line in lines:
-            if line == '': continue 
-            thed = map( int, line.split(" ") )
-            thed = map( lambda x: living_corallites[x].id, thed )
-            print thed
-            thed.sort()
-            for i in range( len( thed ) ):
-                t = thed[:]
-                t.remove( t[i] )
-                if not t in triangles and not t in dup_triangles:
-                    triangles.append( t )
-                    print "\t",t
-                else:
-                    triangles.remove( t )
-                    dup_triangles.append( t )
-                    print "\t", t, "duplicate!"
-        triangles.sort()
-        print len( triangles )
-        print triangles
-        """    """
-        edges = []
-        for tr in triangles:
-            for i in range( len( tr ) ):
-                e = tr[:]
-                e.remove( e[i] )
-                if e in edges :
-                    print "\t", e, "duplicate!"
-                else:
-                #if self.colony.corallites[e[0]-1].get_distance(self.colony.corallites[e[1]-1] ) < 2 * float( self.forms['minimum_distance'].GetValue() ) : 
-                    edges.append( e )
-                    print "\t", e
-        edges.sort()
-        print len(edges),edges
-        """    """
-        self.colony.edges = edges
         return
-    
-      
-    
-    def OnCoralliteSelected(self,event):
+
+    def OnPolypSelected(self,event):
         print "on select"
-        selected_list= self.coralliteList.GetSelections()
+        selected_list= self.polyp_listbox.GetSelections()
         print selected_list
-        for c in self.colony.corallites:
+        for c in self.colony.polyp_list:
             c.selected = False
         for c in selected_list:
           
-            self.coralliteList.GetClientData(c).selected = True
+            self.polyp_listbox.GetClientData(c).selected = True
             #pass
             #c.selected = True
         return
-
-    def OnLoadList(self,event):
-        self.Button1.SetLabel( "Play" )
-        self.is_growing = False
-        self.LoadList()
     
-    def OnLoadNeighbor(self,event):
-        idx = self.coralliteList.GetSelections()
-        print "load neighbor selection", idx
-        c = self.coralliteList.GetClientData( idx[0] )
-        print "watch colrallite", c.id
-        self.WatchCorallite( c )
-    
-    def WatchCorallite(self, corallite ):
-        if self.is_watching_corallite == True:
-            self.corallite_being_watched.being_watched = False
-            for c in self.colony.corallites:
-                c.being_watched = False
-                c.is_neighbor = False
-        self.is_watching_corallite = True
-        self.corallite_being_watched = corallite
-        
-        corallite.being_watched = True
-        self.UpdateNeighborList( corallite )
-    
-    def UpdateNeighborList(self,corallite):
-        for c in self.colony.corallites:
-            c.is_neighbor = False
-        self.neighborList.Clear()
-        neighbors = corallite.get_neighbors()# log = True)
-        #print corallite.id, corallite.pos
-        for n in neighbors:
-            if n.dead == False:
-                n.is_neighbor = True
-                self.neighborList.Append( str( n.id ), n )
-                #print "  neighbor", n.id, n.is_neighbor, n.pos
-      
-    def LoadList(self):
-        selected_list= self.coralliteList.GetSelections()
-        self.coralliteList.Clear()
-        for c in self.colony.corallites:
-            if c.dead == False:
-                lastidx = self.coralliteList.Append( str( c.id ), c )
-                if c.selected == True:
-                    self.coralliteList.SetSelection( lastidx )
-        for idx in selected_list:
-            self.coralliteList.SetSelection( idx )
-    
-    def OnButton1(self,event):
+    def OnPlay(self,event):
         if self.is_growing:
             self.is_growing = False
-            self.Button1.SetLabel( "Play" )
+            self.PlayButton.SetLabel( "Play" )
         else:
             self.is_growing = True
-            self.Button1.SetLabel( "Pause" )
+            self.PlayButton.SetLabel( "Pause" )
 
-    def OnButton2(self,event):
+    def OnReset(self,event):
       
         self.ResetColony()
       
     def ResetColony(self):
-        self.colony = CoralColony()
+        #self.colony = CoralColony()
+        depth = int( self.forms['depth'].GetValue() )
+ 
+        self.colony = CoralColony( depth = depth )
+        
+        config = {}
+        config['lateral_growth_criterion'] = float( self.forms['lateral_growth_criterion'].GetValue() )
+        config['lateral_growth_period'] = int( self.forms['lateral_growth_period'].GetValue() )
+        config['surface_irradiance'] = float( self.forms['surface_irradiance'].GetValue() )
+        config['attenuation_coefficient'] = float( self.forms['attenuation_coefficient'].GetValue() )
+        config['max_irradiance'] = float( self.forms['max_irradiance'].GetValue() )
+        config['reflection_rate'] = float( self.forms['reflection_rate'].GetValue() )
+        config['growth_constant'] = float( self.forms['growth_constant'].GetValue() )
+        config['polyp_radius'] = float( self.forms['polyp_radius'].GetValue() )
+        config['zoom'] = float( self.forms['zoom'].GetValue() )
+
+        self.colony.config = config
+
+        x_pos = [ -4.5, 0, 4.5 ]
+        y_pos = [ 0, 0, 0 ]
+        z_pos = [ 1.5, 4, 1.5 ]
+        grow_vector = [ array( [ -3, 0, 4 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 3, 0, 4 ], float ) ]
+        
+        
+        for i in xrange( 3 ):
+            p = CoralPolyp( self.colony, pos = array( [ x_pos[i], y_pos[i], z_pos[i] ], float ) )
+            p.growth_vector = grow_vector[i]
+            self.colony.add_polyp( p )
+            
+        #colony.prev_polyp_count = 3
+        self.colony.init_colony_2d()
+        '''
         self.colony.set_minimum_distance_for_division( float( self.forms['minimum_distance'].GetValue() ) )
         self.colony.set_neighbor_distance_threshold( float( self.forms['neighbor_distance'].GetValue() ) )
         self.colony.set_neighbor_count_threshold( float( self.forms['neighbor_count'].GetValue() ) )
@@ -730,23 +702,71 @@ class CoralMakerFrame( wx.Frame ):
         self.colony.set_branching_rate( float( self.forms['branching'].GetValue() ) )
         self.colony.set_away_1( float( self.forms['away1'].GetValue() ) )
         self.colony.set_away_2( float( self.forms['away2'].GetValue() ) )
-        self.control.SetColony( self.colony )
+        '''
+        
+        #self.ColonyView.SetColony( self.colony )
+
     def OnTimer(self,event):
         if self.is_growing:
             self.colony.grow()
+            #self.ColonyView
+
+            #self.ColonyView.
+
             self.LoadList()
-            if self.is_watching_corallite == True:
-                self.UpdateNeighborList( self.corallite_being_watched )
+        self.OnPaint(None)
+            #    self.UpdateNeighborList( self.corallite_being_watched )
+    def LoadList(self):
+        print "load list"
+        self.polyp_listbox.Clear()
+        h = self.colony.head_polyp
+        self.polyp_listbox.Append( str( h.id ), h )
+        while h.next_polyp:
+            h = h.next_polyp
+            self.polyp_listbox.Append( str( h.id ), h )
 
     
-class CoralMakerApp(wx.App):
+class ColonySimulator2DApp(wx.App):
     def OnInit(self):
         #self.dbpath = ""
         self.frame = ''
-        self.frame = CoralMakerFrame(None, -1, 'CoralMaker')
+        self.frame = ColonySimulator2DFrame(None, -1, 'Colony Simulator 2D')
         self.frame.Show(True) 
         self.SetTopWindow(self.frame)
         return True
-#app = CoralMakerApp(0)
-#print sys.argv[0]
-#app.MainLoop()
+
+def piltoimage(pil,alpha=True):
+    """Convert PIL Image to wx.Image."""
+    if alpha:
+        #print "alpha 1", clock()
+        image = apply( wx.EmptyImage, pil.size )
+        #print "alpha 2", clock()
+        image.SetData( pil.convert( "RGB").tostring() )
+        #print "alpha 3", clock()
+        image.SetAlphaData(pil.convert("RGBA").tostring()[3::4])
+        #print "alpha 4", clock()
+    else:
+        #print "no alpha 1", clock()
+        image = wx.EmptyImage(pil.size[0], pil.size[1])
+        #print "no alpha 2", clock()
+        new_image = pil.convert('RGB')
+        #print "no alpha 3", clock()
+        data = new_image.tostring()
+        #print "no alpha 4", clock()
+        image.SetData(data)
+        #print "no alpha 5", clock()
+    #print "pil2img", image.GetWidth(), image.GetHeight()
+    return image
+
+def imagetopil(image):
+    """Convert wx.Image to PIL Image."""
+    #print "img2pil", image.GetWidth(), image.GetHeight()
+    pil = Image.new('RGB', (image.GetWidth(), image.GetHeight()))
+    pil.fromstring(image.GetData())
+    return pil
+    
+
+
+app = ColonySimulator2DApp(0)
+print sys.argv[0]
+app.MainLoop()
