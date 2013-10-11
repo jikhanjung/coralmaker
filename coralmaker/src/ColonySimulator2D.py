@@ -314,18 +314,19 @@ class CoralPolyp():
     def print_to_dc(self, dc, origin, color = "black"):
 
         #dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
-        dc.Clear()
+        #dc.Clear()
         dw, dh = dc.GetSize()
 
         dc.SetPen(wx.Pen("black", 1))
 
         if self.next_polyp:
+            print "next polyp"
             arr = []
             x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
             y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
             x2 = round( self.next_polyp.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
             y2 = round( self.next_polyp.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
-
+            print "draw line"
             dc.DrawLine( x1, y1, x2, y2 )
 
         x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
@@ -431,6 +432,7 @@ class CoralColony():
             #print p.pos
     def print_to_dc(self, dc ):
         w,h = dc.GetSize()
+        print "dc size", w, h
         origin = [ w / 2, h - 10 ]
         #print "num polyps", len( self.polyp_list )
         for p in self.polyp_list:
@@ -476,6 +478,32 @@ for d in [ 1, 20, 50 ]:
         #print colony.to_string()
 '''
 
+class ColonyViewControl(wx.Window):
+    def __init__(self,parent,id):
+        wx.Window.__init__(self,parent,id)
+        self.Bind( wx.EVT_PAINT, self.OnPaint )
+        self.img = img = wx.EmptyImage(640,480)
+        img.SetRGBRect(wx.Rect(0,0,640,480), 128, 128, 128) 
+        #self.SetImage(img, True)
+        self.buffer = wx.BitmapFromImage( self.img )
+
+    def OnPaint(self,event):
+        print "colonyview on paint"
+        dc = wx.BufferedPaintDC(self, self.buffer)
+        
+    def SetColony(self,colony):
+        self.colony = colony
+
+    def DrawToBuffer(self):
+        #print "prepare image", time.time() - t0
+        
+        dc = wx.BufferedDC( wx.ClientDC(self), self.buffer )
+        dc.SetBackground( wx.GREY_BRUSH )
+        dc.Clear()
+        #dc.SetPen(wx.Pen("red",1))
+        self.colony.print_to_dc( dc )
+        
+
 ID_POLYP_LISTCTRL = 1001
 ID_NEIGHBOR_LISTCTRL = 1002
 ID_CHK_SHOW_INDEX = 1003
@@ -492,12 +520,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.Bind(wx.EVT_TIMER, self.OnTimer, self.growth_timer)
         self.growth_timer.Start(self.interval)
         
-        #self.show_index = False
-        
-        
-        #self.control = MdCanvas(self)
-
-        self.ColonyView = wx.Window( self, -1 )
+        self.ColonyView = ColonyViewControl( self, -1 )
         self.ColonyView.SetMinSize((800,600))
         self.PlayButton = wx.Button(self, wx.ID_ANY, 'Play')
         self.ResetButton = wx.Button(self, wx.ID_ANY, 'Reset')
@@ -512,7 +535,6 @@ class ColonySimulator2DFrame( wx.Frame ):
         #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
         #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
         #self.chkEnhanceVerticalGrowth.SetValue( self.show_index)  
-        self.Bind( wx.EVT_PAINT, self.OnPaint, self.ColonyView )
         
         sizer1 = wx.BoxSizer(wx.HORIZONTAL)
         sizer1.Add( self.PlayButton , wx.ALIGN_CENTER   )
@@ -609,33 +631,33 @@ class ColonySimulator2DFrame( wx.Frame ):
         #self.control.SetColony( self.colony )
         # self.control.ShowIndex()
         #self.control.BeginAutoRotate(500)
-        self.InitBuffer()
+        #self.InitBuffer()
 
-    def InitBuffer(self):
-        print "init buffer"
-        w, h = self.ColonyView.GetClientSize()
-        self.buffer = wx.EmptyBitmap(w, h)
-        dc = wx.BufferedDC(wx.ClientDC(self.ColonyView), self.buffer)
-        self.DrawColony(dc)
+        #self.Bind( wx.EVT_PAINT, self.OnPaint )
+        #dc = wx.ClientDC( self )
+        #dc.DrawLine( 100, 100, 200, 200 )
 
-    def OnSize(self,event):
-        #print "onsize"
-        self.InitBuffer()
+    '''
+    def OnPaint(self,evt):
+        dc = wx.PaintDC(self)
+        self.DrawColony( dc )
 
-    def OnPaint(self, event):
-        print "onpaint"
-        dc = wx.BufferedPaintDC(self, self.buffer)
-
-    def DrawColony(self,dc):
+    def DrawColony( self, dc ):
+        print "draw colony"
         #image = Image.new( "RGB", ( 800, 600 ), "white" ) 
         #image.save( "colony_" + str( self.colony.depth ) + ".png" )
         #dc = self.ColonyView.
-        self.colony.print_to_dc( dc )
+        #dc = wx.ClientDC( self )
+        #dc.Clear()
+        #self.colony.print_to_dc( dc )
+        dc.DrawLine( 100, 100, 200, 200 )
+        #self.ColonyView.Refresh()
+        #self.Refresh()
         #wximg = piltoimage(image)
         #self.ColonyView.SetBitmap( wximg.ConvertToBitmap())
         
         return
-
+    '''
     def OnPolypSelected(self,event):
         print "on select"
         selected_list= self.polyp_listbox.GetSelections()
@@ -693,6 +715,7 @@ class ColonySimulator2DFrame( wx.Frame ):
             
         #colony.prev_polyp_count = 3
         self.colony.init_colony_2d()
+        self.ColonyView.SetColony( self.colony )
         '''
         self.colony.set_minimum_distance_for_division( float( self.forms['minimum_distance'].GetValue() ) )
         self.colony.set_neighbor_distance_threshold( float( self.forms['neighbor_distance'].GetValue() ) )
@@ -709,12 +732,17 @@ class ColonySimulator2DFrame( wx.Frame ):
     def OnTimer(self,event):
         if self.is_growing:
             self.colony.grow()
+            self.ColonyView.DrawToBuffer()
+            #self.DrawColony()
+            
+            #print "refresh"
+            #self.Refresh()
             #self.ColonyView
 
             #self.ColonyView.
 
             self.LoadList()
-        self.OnPaint(None)
+        #self.OnPaint(None)
             #    self.UpdateNeighborList( self.corallite_being_watched )
     def LoadList(self):
         print "load list"
