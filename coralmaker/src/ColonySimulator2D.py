@@ -40,14 +40,22 @@ class CoralPolyp():
         self.triangle_list = []
         self.pos = pos
         self.prev_pos = array( [0,0,0], float)
-        self.prev_pos_list = []
+        self.annual_pos_list = []
         self.prev_polyp = None
         self.next_polyp = None
         self.age_in_month = 0
+        self.selected = False
         if( parent.className == "CoralColony" ):
             self.colony = parent
         else:
             self.colony = parent.colony
+
+    def record_annual_position(self):
+        curr_pos = []
+        curr_pos[:] = self.pos[:]
+        self.annual_pos_list.append( curr_pos )
+        #print "record annual polyp position", self.id, curr_pos, self.annual_pos_list
+        return self.pos
 
     def scan_neighbors( self ):
         polyp_list = self.colony.polyp_list
@@ -71,7 +79,7 @@ class CoralPolyp():
         depth = self.get_depth()
         vec = self.grow_vector / linalg.norm( self.grow_vector ) 
         cos_val = vec[Z_INDEX]
-        print cos_val
+        #print cos_val
 
         radiance_base = self.config['surface_irradiance'] * math.exp( -1 * self.config['attenuation_coefficient'] * depth ) #Wm-2
         
@@ -111,7 +119,7 @@ class CoralPolyp():
         
         self.pos += ( self.growth_vector / linalg.norm( self.growth_vector ) ) * growth_rate
         self.age_in_month += 1
-        print self.id, self.pos
+        #print self.id, self.pos
         return
     
     def has_enough_space_2d(self, neighboring_polyp ):
@@ -196,7 +204,7 @@ class CoralPolyp():
         p1 = self.pos
         p2 = neighboring_polyp.pos
 
-        print "get local center:", v1, v2, p1, p2
+        #print "get local center:", v1, v2, p1, p2
         a1 = -1 * v1[2]
         b1 = v1[0]
         c1 = a1 * p1[0] + b1 * p1[2]
@@ -213,7 +221,7 @@ class CoralPolyp():
         
 
     def grow_laterally(self):
-        print "grow laterally"
+        #print "grow laterally"
         p = CoralPolyp( self )
 
         if self.next_polyp: # head
@@ -234,7 +242,7 @@ class CoralPolyp():
         e = self.get_lower_edge_2d()
         #print e
         if e[2] < self.radius * 2:
-            print "aa"
+            #print "aa"
             z = e[2] / 2
             sign = ( e[0] / abs( e[0] ) )
             x = e[0] + ( math.sqrt(  ( self.radius * 2 ) ** 2 - e[2] ** 2) / 2 ) * sign 
@@ -243,7 +251,7 @@ class CoralPolyp():
             #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
             p.growth_vector = ( self.growth_vector + array( [ sign, 0, 0 ], float ) ) / 2
         else:
-            print "bb"
+            #print "bb"
             center = p1.get_local_center(p2)
             v1 = p1.pos - center
             v2 = p2.pos - center
@@ -261,13 +269,13 @@ class CoralPolyp():
                 #a[i] = new_vec[0,i]
                 #b[i] = new_pos[0,i]
             
-            print "new:", new_vec, new_pos, a, b, center
+            #print "new:", new_vec, new_pos, a, b, center
             p.growth_vector = a
             p.pos = b
             #pass
             #p.pos = array( [ , , ], float )
         self.colony.add_polyp(p)
-        print "lateral:", p1.pos, p2.pos, p.pos
+        #print "lateral:", p1.pos, p2.pos, p.pos
     
     def get_edge_2d(self):
         center = self.pos
@@ -300,13 +308,9 @@ class CoralPolyp():
                 arr.append( round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
             imgdr.line( arr, fill = color )
 
-        arr = []
-        for p in [ self.pos, self.prev_pos ]:
-            arr.append( round( p[X_INDEX] * self.colony.config['zoom'] ) + origin[0] )
-            arr.append( round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
         #imgdr.line( arr, fill = color )
         #print "pos:", self.prev_pos, self.pos
-        self.prev_pos_list.append( self.prev_pos[:] )
+        #self.prev_pos_list.append( self.prev_pos[:] )
         self.prev_pos[:] = self.pos[:]
         
         return
@@ -320,23 +324,48 @@ class CoralPolyp():
         dc.SetPen(wx.Pen("black", 1))
 
         if self.next_polyp:
-            print "next polyp"
+            #print "next polyp"
             arr = []
             x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
             y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
             x2 = round( self.next_polyp.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
             y2 = round( self.next_polyp.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
-            print "draw line"
+            #print "draw line"
             dc.DrawLine( x1, y1, x2, y2 )
 
-        x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
-        y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
-        x2 = round( self.prev_pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
-        y2 = round( self.prev_pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
-        #dc.DrawLine( x1, y1, x2, y2 )
+
+        trace = []
+
+        #print self.annual_pos_list
+        for p in self.annual_pos_list:
+            x1 = round( p[X_INDEX] * self.colony.config['zoom'] ) 
+            y1 = round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 
+            pt = wx.Point( x1, y1 )
+            trace.append( pt )
+        x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) 
+        y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 
         
-        self.prev_pos_list.append( self.prev_pos[:] )
-        self.prev_pos[:] = self.pos[:]
+        pt = wx.Point( x1, y1 )
+        trace.append( pt )
+
+        if self.selected:
+            #print "selected", self.id
+            dc.SetPen(wx.Pen("red", 1))
+            
+        dc.DrawLines( trace, xoffset = origin[0], yoffset = origin[1] )
+        
+        if self.selected:
+            #print "selected", self.id
+            dc.SetPen(wx.Pen("red", 1))
+            x1 = int( round( self.pos[X_INDEX] * self.colony.config['zoom'] ) ) + origin[0] 
+            y1 = int( round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 )  + origin[1]
+            #print "x1, y1", x1, y1
+            dc.DrawCircle( x1, y1, 5)
+            txt = str( self.id ) + ":" + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
+            #print txt
+            dc.DrawText( txt, x1 - 30, y1 - 50 )
+            #dc.DrawLine( 10, 10, 100, 100)
+
         
         return
 
@@ -352,6 +381,7 @@ class CoralColony():
         self.prev_polyp_count = 0
         self.lateral_growth_criterion = 0.01
         self.lateral_growth_period = 1 #month
+        self.annual_shape = []
         return
         
     def add_polyp( self, p ):
@@ -363,13 +393,26 @@ class CoralColony():
     
     def lateral_growth_check(self):
         polyp_count = len( self.polyp_list )
-        print "polyp_count:", self.prev_polyp_count, polyp_count
+        #print "polyp_count:", self.prev_polyp_count, polyp_count
         if( float( polyp_count - self.prev_polyp_count ) / float( self.prev_polyp_count ) < self.lateral_growth_criterion ):
             self.head_polyp.grow_laterally()
             self.tail_polyp.grow_laterally()
             pass
         self.prev_polyp_count = polyp_count
         
+    def record_annual_growth(self):
+        p = self.head_polyp
+        p.record_annual_position()
+        arr = []
+        pt = wx.Point( p.pos[X_INDEX], p.pos[Z_INDEX] * -1 )
+        arr.append( pt)
+        while p.next_polyp:
+            p = p.next_polyp
+            p.record_annual_position()
+            pt = wx.Point( p.pos[X_INDEX], p.pos[Z_INDEX] * -1 )
+            arr.append( pt )
+        self.annual_shape.append( arr )
+            
     def grow(self):
         #p = self.head_polyp
         self.month += 1
@@ -377,6 +420,9 @@ class CoralColony():
         if self.month % self.lateral_growth_period == 0:
             self.lateral_growth_check()
 
+        if self.month % 12 == 0:
+            self.record_annual_growth()
+            
         for p in self.polyp_list:
             p.grow()
         
@@ -394,11 +440,11 @@ class CoralColony():
         return
     
         p = self.head_polyp
-        print i, p.pos
+        #print i, p.pos
         while p.next_polyp:
             i += 1
             p = p.next_polyp
-            print i, ":", p.pos
+            #print i, ":", p.pos
         return
 
     def init_colony_2d(self):
@@ -423,7 +469,7 @@ class CoralColony():
     def print_to_image(self, img ):
         (w,h) = img.size
         origin = [ w / 2, h - 10 ]
-        print "num polyps", len( self.polyp_list )
+        #print "num polyps", len( self.polyp_list )
         for p in self.polyp_list:
             color = "red"
             if p == self.head_polyp or p == self.tail_polyp: 
@@ -432,8 +478,10 @@ class CoralColony():
             #print p.pos
     def print_to_dc(self, dc ):
         w,h = dc.GetSize()
-        print "dc size", w, h
+        #print "dc size", w, h
         origin = [ w / 2, h - 10 ]
+        for shape in self.annual_shape:
+            dc.DrawLines( shape, xoffset = origin[0], yoffset = origin[1] )
         #print "num polyps", len( self.polyp_list )
         for p in self.polyp_list:
             color = "red"
@@ -482,13 +530,17 @@ class ColonyViewControl(wx.Window):
     def __init__(self,parent,id):
         wx.Window.__init__(self,parent,id)
         self.Bind( wx.EVT_PAINT, self.OnPaint )
+        self.Reset()
+        
+    def Reset(self):
         self.img = img = wx.EmptyImage(640,480)
         img.SetRGBRect(wx.Rect(0,0,640,480), 128, 128, 128) 
         #self.SetImage(img, True)
         self.buffer = wx.BitmapFromImage( self.img )
 
+
     def OnPaint(self,event):
-        print "colonyview on paint"
+        #print "colonyview on paint"
         dc = wx.BufferedPaintDC(self, self.buffer)
         
     def SetColony(self,colony):
@@ -506,7 +558,7 @@ class ColonyViewControl(wx.Window):
 
 ID_POLYP_LISTCTRL = 1001
 ID_NEIGHBOR_LISTCTRL = 1002
-ID_CHK_SHOW_INDEX = 1003
+ID_TIMER_CHECKBOX= 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
 
 class ColonySimulator2DFrame( wx.Frame ):
@@ -529,8 +581,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         #lb1 = wx.StaticText(self, wx.ID_ANY, '')
         #lb2 = wx.StaticText(self, wx.ID_ANY, '')
         
-        #self.chkShowIndex = wx.CheckBox( self, ID_CHK_SHOW_INDEX, "Show Index" )
-        #self.Bind( wx.EVT_CHECKBOX, self.ToggleShowIndex, id=ID_CHK_SHOW_INDEX )
+        self.timer_checkbox= wx.CheckBox( self, ID_TIMER_CHECKBOX, "Use Timer" )
+        self.Bind( wx.EVT_CHECKBOX, self.ToggleTimer, id=ID_TIMER_CHECKBOX)
         #self.chkShowIndex.SetValue( self.show_index)  
         #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
         #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
@@ -568,6 +620,10 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.polyp_listbox = wx.ListBox( self, -1, choices=(),size=(100,200), style=wx.LB_SINGLE )
 
         sizer2 = wx.FlexGridSizer( 3, 3, 0, 0 )
+
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.timer_checkbox, flag=wx.EXPAND )
 
         sizer2.Add( self.depth_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
@@ -628,6 +684,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         
         self.ResetColony()
         self.is_growing = False
+        self.use_timer = True 
+        self.timer_checkbox.SetValue( self.use_timer )
         #self.control.SetColony( self.colony )
         # self.control.ShowIndex()
         #self.control.BeginAutoRotate(500)
@@ -659,9 +717,9 @@ class ColonySimulator2DFrame( wx.Frame ):
         return
     '''
     def OnPolypSelected(self,event):
-        print "on select"
+        #print "on select"
         selected_list= self.polyp_listbox.GetSelections()
-        print selected_list
+        #print selected_list
         for c in self.colony.polyp_list:
             c.selected = False
         for c in selected_list:
@@ -669,16 +727,11 @@ class ColonySimulator2DFrame( wx.Frame ):
             self.polyp_listbox.GetClientData(c).selected = True
             #pass
             #c.selected = True
+        #self.Refresh()
+        self.ColonyView.DrawToBuffer()
         return
     
-    def OnPlay(self,event):
-        if self.is_growing:
-            self.is_growing = False
-            self.PlayButton.SetLabel( "Play" )
-        else:
-            self.is_growing = True
-            self.PlayButton.SetLabel( "Pause" )
-
+            
     def OnReset(self,event):
       
         self.ResetColony()
@@ -715,7 +768,11 @@ class ColonySimulator2DFrame( wx.Frame ):
             
         #colony.prev_polyp_count = 3
         self.colony.init_colony_2d()
+
         self.ColonyView.SetColony( self.colony )
+        self.ColonyView.Reset()
+        self.ColonyView.DrawToBuffer()
+
         '''
         self.colony.set_minimum_distance_for_division( float( self.forms['minimum_distance'].GetValue() ) )
         self.colony.set_neighbor_distance_threshold( float( self.forms['neighbor_distance'].GetValue() ) )
@@ -726,26 +783,33 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.colony.set_away_1( float( self.forms['away1'].GetValue() ) )
         self.colony.set_away_2( float( self.forms['away2'].GetValue() ) )
         '''
-        
+
         #self.ColonyView.SetColony( self.colony )
+
+    def GrowColony(self):
+        self.colony.grow()
+        self.ColonyView.DrawToBuffer()
+        self.LoadList()
 
     def OnTimer(self,event):
         if self.is_growing:
-            self.colony.grow()
-            self.ColonyView.DrawToBuffer()
-            #self.DrawColony()
-            
-            #print "refresh"
-            #self.Refresh()
-            #self.ColonyView
-
-            #self.ColonyView.
-
-            self.LoadList()
-        #self.OnPaint(None)
+            self.GrowColony()
+    def ToggleTimer(self,event):
+        self.use_timer = self.timer_checkbox.GetValue()
+        
+    def OnPlay(self,event):
+        if self.use_timer:
+            if self.is_growing:
+                self.is_growing = False
+                self.PlayButton.SetLabel( "Play" )
+            else:
+                self.is_growing = True
+                self.PlayButton.SetLabel( "Pause" )
+        else:
+            self.GrowColony()
             #    self.UpdateNeighborList( self.corallite_being_watched )
     def LoadList(self):
-        print "load list"
+        #print "load list"
         self.polyp_listbox.Clear()
         h = self.colony.head_polyp
         self.polyp_listbox.Append( str( h.id ), h )
