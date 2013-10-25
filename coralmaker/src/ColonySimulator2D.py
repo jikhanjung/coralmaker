@@ -142,9 +142,16 @@ class CoralPolyp():
         new_growth_vector = self.rotate( v1, theta )
         
     def rotate(self,vec,theta):
-        rotation_matrix = matrix( [ [ math.cos( theta ), 0, math.sin( theta )] , [-1 * math.sin(theta ), 1, math.cos(theta) ], [ 0, 0, 1 ]])
+        #rotation_matrix = matrix( [ [ math.cos( theta ), 0, math.sin( theta )] , [-1 * math.sin(theta ), 1, math.cos(theta) ], [ 0, 0, 1 ]])
+        rotation_matrix = matrix( [ [ math.cos( theta ), 0, math.sin( theta )] , 
+                                    [ 0, 1, 0 ],
+                                    [-1 * math.sin(theta ), 0, math.cos(theta) ],
+                                ] )
+
+        
         new_vec = dot( vec, rotation_matrix )
-        return new_vec
+        vec = squeeze( asarray( new_vec[0] ) )
+        return vec
 
     def get_angle_between_vectors(self, v1, v2 ):
         
@@ -222,6 +229,12 @@ class CoralPolyp():
 
     def grow_laterally(self):
         #print "grow laterally"
+        e = self.get_lower_edge_2d()
+        print e
+        if e[2] < self.radius * 2:
+            if not self.colony.config['allow_encrusting']:
+                return
+
         p = CoralPolyp( self )
 
         if self.next_polyp: # head
@@ -240,40 +253,42 @@ class CoralPolyp():
             self.colony.tail_polyp = p
 
         e = self.get_lower_edge_2d()
-        #print e
+        print e
         if e[2] < self.radius * 2:
             #print "aa"
             z = e[2] / 2
+            print "z:", z
             sign = ( e[0] / abs( e[0] ) )
             x = e[0] + ( math.sqrt(  ( self.radius * 2 ) ** 2 - e[2] ** 2) / 2 ) * sign 
             p.pos = array( [ x, 0, z ], float )
             #temp_vec = p.pos - e
             #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
             p.growth_vector = ( self.growth_vector + array( [ sign, 0, 0 ], float ) ) / 2
+            print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
         else:
-            #print "bb"
+            print "lateral growth"
             center = p1.get_local_center(p2)
             v1 = p1.pos - center
             v2 = p2.pos - center
+            print "center", center, "v1", v1, "v2", v2
             theta = p1.get_angle_between_vectors(v1, v2)
+            print "theta", theta
             new_vec = p1.rotate( v1, theta )
             new_vec /= linalg.norm( new_vec )
             new_vec *= ( linalg.norm( v1 ) - linalg.norm( v2 ) ) + linalg.norm( v1 ) 
             new_vec = new_vec
             new_pos = center + new_vec
-            a = array( [0,0,0],float)
-            b = array( [0,0,0],float)
-            a[:] = new_vec[0,:]
-            b[:] = new_pos[0,:]
+            print "new_vec", new_vec, "new_pos", new_pos
             #for i in range(3):
                 #a[i] = new_vec[0,i]
                 #b[i] = new_pos[0,i]
             
             #print "new:", new_vec, new_pos, a, b, center
-            p.growth_vector = a
-            p.pos = b
+            p.growth_vector = new_vec
+            p.pos = new_pos
             #pass
             #p.pos = array( [ , , ], float )
+            print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
         self.colony.add_polyp(p)
         #print "lateral:", p1.pos, p2.pos, p.pos
     
@@ -361,7 +376,7 @@ class CoralPolyp():
             y1 = int( round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 )  + origin[1]
             #print "x1, y1", x1, y1
             dc.DrawCircle( x1, y1, 5)
-            txt = str( self.id ) + ":" + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
+            txt = str( self.id ) + ": " + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 50 )
             #dc.DrawLine( 10, 10, 100, 100)
@@ -527,8 +542,8 @@ for d in [ 1, 20, 50 ]:
 '''
 
 class ColonyViewControl(wx.Window):
-    def __init__(self,parent,id):
-        wx.Window.__init__(self,parent,id)
+    def __init__(self,parent,wid):
+        wx.Window.__init__(self,parent,wid)
         self.Bind( wx.EVT_PAINT, self.OnPaint )
         self.Reset()
         
@@ -537,7 +552,6 @@ class ColonyViewControl(wx.Window):
         img.SetRGBRect(wx.Rect(0,0,640,480), 128, 128, 128) 
         #self.SetImage(img, True)
         self.buffer = wx.BitmapFromImage( self.img )
-
 
     def OnPaint(self,event):
         #print "colonyview on paint"
@@ -560,6 +574,7 @@ ID_POLYP_LISTCTRL = 1001
 ID_NEIGHBOR_LISTCTRL = 1002
 ID_TIMER_CHECKBOX= 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
+ID_ENCRUSTING_CHECKBOX= 1005
 
 class ColonySimulator2DFrame( wx.Frame ):
     def __init__(self, parent, wid, name ):
@@ -583,6 +598,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         
         self.timer_checkbox= wx.CheckBox( self, ID_TIMER_CHECKBOX, "Use Timer" )
         self.Bind( wx.EVT_CHECKBOX, self.ToggleTimer, id=ID_TIMER_CHECKBOX)
+        self.encrusting_checkbox= wx.CheckBox( self, ID_ENCRUSTING_CHECKBOX, "Allow encrusting" )
+        self.Bind( wx.EVT_CHECKBOX, self.ToggleEncrusting, id=ID_ENCRUSTING_CHECKBOX)
         #self.chkShowIndex.SetValue( self.show_index)  
         #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
         #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
@@ -624,6 +641,10 @@ class ColonySimulator2DFrame( wx.Frame ):
         sizer2.Add( (10,10), flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
         sizer2.Add( self.timer_checkbox, flag=wx.EXPAND )
+
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.encrusting_checkbox, flag=wx.EXPAND )
 
         sizer2.Add( self.depth_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
@@ -682,18 +703,13 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.Bind(wx.EVT_LISTBOX, self.OnPolypSelected, self.polyp_listbox )
         self.SetSizer(fs)
         
-        self.ResetColony()
         self.is_growing = False
         self.use_timer = True 
         self.timer_checkbox.SetValue( self.use_timer )
-        #self.control.SetColony( self.colony )
-        # self.control.ShowIndex()
-        #self.control.BeginAutoRotate(500)
-        #self.InitBuffer()
+        self.allow_encrusting = False
+        self.encrusting_checkbox.SetValue( self.allow_encrusting )
 
-        #self.Bind( wx.EVT_PAINT, self.OnPaint )
-        #dc = wx.ClientDC( self )
-        #dc.DrawLine( 100, 100, 200, 200 )
+        self.ResetColony()
 
     '''
     def OnPaint(self,evt):
@@ -752,6 +768,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         config['growth_constant'] = float( self.forms['growth_constant'].GetValue() )
         config['polyp_radius'] = float( self.forms['polyp_radius'].GetValue() )
         config['zoom'] = float( self.forms['zoom'].GetValue() )
+        config['allow_encrusting'] = self.allow_encrusting
 
         self.colony.config = config
 
@@ -794,9 +811,13 @@ class ColonySimulator2DFrame( wx.Frame ):
     def OnTimer(self,event):
         if self.is_growing:
             self.GrowColony()
+
     def ToggleTimer(self,event):
         self.use_timer = self.timer_checkbox.GetValue()
-        
+
+    def ToggleEncrusting(self,event):
+        self.allow_encrusting = self.encrusting_checkbox.GetValue()
+
     def OnPlay(self,event):
         if self.use_timer:
             if self.is_growing:
@@ -808,6 +829,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         else:
             self.GrowColony()
             #    self.UpdateNeighborList( self.corallite_being_watched )
+
     def LoadList(self):
         #print "load list"
         self.polyp_listbox.Clear()
