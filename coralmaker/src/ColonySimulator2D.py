@@ -40,22 +40,23 @@ class CoralPolyp():
         self.triangle_list = []
         self.pos = pos
         self.prev_pos = array( [0,0,0], float)
-        self.annual_pos_list = []
+        self.pos_list = []
         self.prev_polyp = None
         self.next_polyp = None
         self.age_in_month = 0
         self.selected = False
         self.irradiance = -1
         self.growth_rate = -1
+        self.alive = True
         if( parent.className == "CoralColony" ):
             self.colony = parent
         else:
             self.colony = parent.colony
 
-    def record_annual_position(self):
+    def record_position(self):
         curr_pos = []
         curr_pos[:] = self.pos[:]
-        self.annual_pos_list.append( curr_pos )
+        self.pos_list.append( curr_pos )
         #print "record annual polyp position", self.id, curr_pos, self.annual_pos_list
         return self.pos
 
@@ -125,6 +126,28 @@ class CoralPolyp():
         self.age_in_month += 1
         #print self.id, self.pos
         return
+    
+    def die(self):
+        print "die", self.id
+        self.alive = False
+        if self.next_polyp:
+            if self.prev_polyp:
+                self.next_polyp.prev_polyp = self.prev_polyp
+                self.prev_polyp.next_polyp = self.next_polyp
+            else:
+                self.next_polyp.prev_polyp = None
+                self.colony.head_polyp = self.next_polyp
+        else:
+            if self.prev_polyp:
+                self.prev_polyp.next_polyp = None
+                self.colony.tail_polyp = self.prev_polyp
+        return
+
+    def check_dead_or_alive(self):
+        #print "check die"
+        if self.pos[Z_INDEX] <= 0 and self.growth_vector[Z_INDEX] < 0:
+            print self.id, self.pos,self.growth_vector 
+            self.die()
     
     def has_enough_space_2d(self, neighboring_polyp ):
         dist = self.get_distance( neighboring_polyp ) 
@@ -216,6 +239,7 @@ class CoralPolyp():
         return
     
     def recalculate_growth_vector(self):
+        
         if not self.next_polyp:
             return
         if not self.prev_polyp:
@@ -229,6 +253,66 @@ class CoralPolyp():
         new_vec = self.rotate( vec, math.pi / 2 )
         self.growth_vector = new_vec / linalg.norm( new_vec )
 
+
+        return
+
+    def apply_new_growth_vector(self):
+        self.growth_vector = self.new_growth_vector
+        return
+    
+    def calculate_new_growth_vector(self):
+         
+        ''' head or tail '''
+        if self == self.colony.head_polyp:
+            n1 = self.next_polyp
+            n2 = n1.next_polyp 
+            print "head:", n1.pos, n1.growth_vector, n2.pos, n2.growth_vector
+            theta = self.get_angle_between_vectors( n1.growth_vector, n2.growth_vector)
+            new_growth_vector = self.rotate( n1.growth_vector, theta )
+            print "head new growth vector", new_growth_vector
+            self.new_growth_vector = new_growth_vector / linalg.norm( new_growth_vector )
+            return
+
+        if self == self.colony.tail_polyp:
+            p1 = self.prev_polyp
+            p2 = p1.prev_polyp 
+            theta = self.get_angle_between_vectors( p1.growth_vector, p2.growth_vector)
+            new_growth_vector = self.rotate( p1.growth_vector, theta )
+            self.new_growth_vector = new_growth_vector / linalg.norm( new_growth_vector )
+            return
+            
+        p1 = self.prev_polyp
+        n1 = self.next_polyp
+        
+        ''' next to head or tail '''
+        if p1 == self.colony.head_polyp or n1 == self.colony.tail_polyp:
+            vec = n1.pos - p1.pos 
+            new_vector = self.rotate( vec, math.pi / 2 )
+            new_growth_vector = new_vector + self.growth_vector + p1.growth_vector + n1.growth_vector
+            self.new_growth_vector = new_growth_vector / linalg.norm( new_growth_vector )
+            return
+
+
+        ''' all other cases '''
+        p2 = p1.prev_polyp
+        n2 = n1.next_polyp
+        
+        polyp_list = [ p2, p1, self, n1, n2 ]
+        
+        gv_list = []
+        for i in range( 1, len( polyp_list ) ):
+            for j in range( len( polyp_list ) - i ):
+                vec = polyp_list[i+j].pos - polyp_list[j].pos
+                gv = self.rotate( vec, math.pi / 2 )
+                gv_list.append( gv )
+        
+        sum_gv = array( [0, 0, 0], float)
+        for gv in gv_list:
+            sum_gv += gv
+        new_gv = sum_gv / len( gv_list )
+        self.new_growth_vector = new_gv / linalg.norm( new_gv )
+        return
+
     def get_local_center(self,neighboring_polyp):
         
         v1 = self.growth_vector
@@ -237,7 +321,7 @@ class CoralPolyp():
         p1 = self.pos
         p2 = neighboring_polyp.pos
 
-        #print "get local center:", v1, v2, p1, p2
+        print "get local center:", v1, v2, p1, p2
         a1 = -1 * v1[2]
         b1 = v1[0]
         c1 = a1 * p1[0] + b1 * p1[2]
@@ -292,18 +376,19 @@ class CoralPolyp():
             p.growth_vector = ( self.growth_vector + array( [ sign, 0, 0 ], float ) ) / 2
             #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
         else:
-            print "lateral growth"
+            print "lateral growth", p1.pos, p2.pos
+            
             center = p1.get_local_center(p2)
             v1 = p1.pos - center
             v2 = p2.pos - center
-            print "center", center, "v1", v1, "v2", v2
+            print "center", center, "v1", v1, linalg.norm( v1 ),  "v2", v2, linalg.norm( v2 )
             theta = p1.get_angle_between_vectors(v1, v2)
             print "theta", theta
             new_vec = p1.rotate( v1, theta )
             new_vec /= linalg.norm( new_vec )
             new_vec *= ( linalg.norm( v1 ) - linalg.norm( v2 ) ) + linalg.norm( v1 ) 
-            new_vec = new_vec/ linalg.norm( new_vec )
             new_pos = center + new_vec
+            new_vec = new_vec/ linalg.norm( new_vec )
             print "new_vec", new_vec, "new_pos", new_pos
             #for i in range(3):
                 #a[i] = new_vec[0,i]
@@ -314,8 +399,8 @@ class CoralPolyp():
             p.pos = new_pos
             #pass
             #p.pos = array( [ , , ], float )
-            print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
         self.colony.add_polyp(p)
+        print "lateral:", self.id, self.pos, self.growth_vector, "new lateral:", p.id, p.pos, p.growth_vector
         #print "lateral:", p1.pos, p2.pos, p.pos
     
     def get_edge_2d(self):
@@ -380,7 +465,7 @@ class CoralPolyp():
         trace = []
 
         #print self.annual_pos_list
-        for p in self.annual_pos_list:
+        for p in self.pos_list:
             x1 = round( p[X_INDEX] * self.colony.config['zoom'] ) 
             y1 = round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 
             pt = wx.Point( x1, y1 )
@@ -409,7 +494,7 @@ class CoralPolyp():
             txt = str( self.id ) + ": " + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 50 )
-            txt = ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.growth_vector[X_INDEX], self.growth_vector[Z_INDEX] ] ] )
+            txt = ", ".join( [ str( round( x * 100 ) / 100.0 ) for x in [ self.growth_vector[X_INDEX], self.growth_vector[Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 65 )
             irradiance = round( self.irradiance * 100 ) / 100.0 
@@ -417,12 +502,7 @@ class CoralPolyp():
             dc.DrawText( str( irradiance ), x1 - 30, y1 - 80)
             dc.DrawText( str( growth_rate ), x1 - 30, y1 - 95)
             #dc.DrawLine( 10, 10, 100, 100)
-
-        #print "zoom 4", self.colony.config['zoom']
-
         return
-
-
 
 class CoralColony():
     def __init__(self, depth = 1 ):
@@ -455,51 +535,63 @@ class CoralColony():
         
     def record_annual_growth(self):
         p = self.head_polyp
-        p.record_annual_position()
         arr = []
         pt = wx.Point( p.pos[X_INDEX], p.pos[Z_INDEX] * -1 )
         arr.append( pt)
         while p.next_polyp:
             p = p.next_polyp
-            p.record_annual_position()
+            #p.record_position()
             pt = wx.Point( p.pos[X_INDEX] , p.pos[Z_INDEX] * -1 )
             arr.append( pt )
         self.annual_shape.append( arr )
-            
+
     def grow(self):
         #p = self.head_polyp
-        self.month += 1
         #if self.month % 1 == 0:
+        for p in self.polyp_list:
+            p.record_position()
+
         if self.month % self.lateral_growth_period == 0:
             self.lateral_growth_check()
 
         if self.month % 12 == 0:
             self.record_annual_growth()
             
+        self.month += 1
+
         for p in self.polyp_list:
-            p.grow()
+            if p.alive:
+                p.grow()
         
         for p in self.polyp_list:
             #print p.id, p.pos, len( self.polyp_list )
-            if p.prev_polyp:
-                if p.has_enough_space_2d( p.prev_polyp ):
-                    p.bud_2d( p.prev_polyp )
-            if p.next_polyp:
-                if p.has_enough_space_2d( p.next_polyp ):
-                    p.bud_2d( p.next_polyp )
+            if p.alive:
+                if p.next_polyp:
+                    if p.has_enough_space_2d( p.next_polyp ):
+                        p.bud_2d( p.next_polyp )
 
         for p in self.polyp_list:
-            p.recalculate_growth_vector()
-        
-                    
-        i = 1
+            if p.alive:
+                p.calculate_new_growth_vector()
+
+        for p in self.polyp_list:
+            if p.alive:
+                p.apply_new_growth_vector()
+
+        for p in self.polyp_list:
+            if p.alive:
+                p.check_dead_or_alive()
+
+        for p in self.polyp_list:
+            print p.id,
+        print
         
         return
     
         p = self.head_polyp
         #print i, p.pos
         while p.next_polyp:
-            i += 1
+            #i += 1
             p = p.next_polyp
             #print i, ":", p.pos
         return
@@ -938,7 +1030,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         x_pos = [ -9, -5, 0, 5, 9 ]
         y_pos = [ 0, 0, 0, 0, 0 ]
         z_pos = [ 0, 3, 5, 3, 0]
-        grow_vector = [ array( [ -1, 0, 0 ], float ), array( [ -3, 0, 4 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 3, 0, 4 ], float ),array( [ 1, 0, 0 ], float ) ]
+        grow_vector = [ array( [ -1, 0, 0.01 ], float ), array( [ -1, 0, 1 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 1, 0, 1 ], float ),array( [ 1, 0, 0.01 ], float ) ]
         
         
         for i in xrange( 5 ):
@@ -952,6 +1044,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.ColonyView.SetColony( self.colony )
         self.ColonyView.Reset()
         self.ColonyView.DrawToBuffer()
+        self.LoadList()
 
         '''
         self.colony.set_minimum_distance_for_division( float( self.forms['minimum_distance'].GetValue() ) )
