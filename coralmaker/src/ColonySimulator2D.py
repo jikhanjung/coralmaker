@@ -7,6 +7,7 @@ Created on Sep 21, 2013
 X_INDEX = 0
 Y_INDEX = 1
 Z_INDEX = 2
+MAX_COLONY_SIZE = 300
 import os
 import wx
 import sys
@@ -131,6 +132,29 @@ class CoralPolyp():
         #print self.id, self.pos
         return
     
+    def check_space(self):
+        return
+        if self.next_polyp:
+            p1 = self.pos
+            p2 = self.next_polyp.pos
+            v1 = p2 - p1
+            
+            x1 = min( p1[X_INDEX], p2[X_INDEX] )
+            x2 = max( p1[X_INDEX], p2[X_INDEX] )
+            z1 = min( p1[Z_INDEX], p2[X_INDEX] )
+            z2 = min( p1[Z_INDEX], p2[Z_INDEX] )
+            
+            from_x = math.ceil(x1)
+            to_x = math.floor(x2)
+            from_z = math.ceil(z1)
+            to_z = math.floor(z2)
+            
+            for x in range( from_x, to_x+1):
+                for z in range( from_z, to_z+1):
+                    pass
+            
+            
+            
     def die(self):
         print "die", self.id
         self.alive = False
@@ -390,15 +414,16 @@ class CoralPolyp():
         e = self.get_lower_edge_2d()
         #print e
         if e[2] < self.radius * 2:
-            #print "aa"
+            #print "encrusting"
+            '''encrusting'''
             z = e[2] / 2
             #print "z:", z
-            sign = ( e[0] / abs( e[0] ) )
-            x = e[0] + ( math.sqrt(  ( self.radius * 2 ) ** 2 - e[2] ** 2) / 2 ) * sign 
+            sign = ( e[0] / math.fabs( e[0] ) )
+            x = e[0] + ( math.sqrt(  self.radius ** 2 - z ** 2 ) ) * sign 
             p.pos = array( [ x, 0, z ], float )
-            #temp_vec = p.pos - e
+            temp_vec = p.pos - e
             #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
-            p.growth_vector = ( self.growth_vector + array( [ sign, 0, 0 ], float ) ) / 2
+            p.growth_vector = self.rotate( temp_vec, math.pi * sign )
             #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
         else:
             #print "lateral growth", p1.pos, p2.pos
@@ -546,6 +571,7 @@ class CoralColony():
         self.lateral_growth_criterion = 0.01
         self.lateral_growth_period = 1 #month
         self.annual_shape = []
+        self.space = zeros( ( MAX_COLONY_SIZE, MAX_COLONY_SIZE) )
         return
         
     def add_polyp( self, p ):
@@ -558,10 +584,10 @@ class CoralColony():
     def lateral_growth_check(self):
         polyp_count = len( self.polyp_list )
         #print "polyp_count:", self.prev_polyp_count, polyp_count
-        if( float( polyp_count - self.prev_polyp_count ) / float( self.prev_polyp_count ) < self.lateral_growth_criterion ):
+        if( float( polyp_count - self.prev_polyp_count ) / float( self.prev_polyp_count ) < self.config['lateral_growth_criterion'] ):
             self.head_polyp.grow_laterally()
             self.tail_polyp.grow_laterally()
-            pass
+            #pass
         self.prev_polyp_count = polyp_count
         
     def record_annual_growth(self):
@@ -582,7 +608,8 @@ class CoralColony():
         for p in self.polyp_list:
             p.record_position()
 
-        if self.month % self.lateral_growth_period == 0:
+        print "lateral_growth_period:", self.config['lateral_growth_period']
+        if self.month % self.config['lateral_growth_period'] == 0:
             self.lateral_growth_check()
 
         if self.month % 12 == 0:
@@ -593,6 +620,8 @@ class CoralColony():
         for p in self.polyp_list:
             if p.alive:
                 p.grow()
+                p.check_space()
+
         
         for p in self.polyp_list:
             #print p.id, p.pos, len( self.polyp_list )
@@ -613,9 +642,9 @@ class CoralColony():
             if p.alive:
                 p.check_dead_or_alive()
 
-        for p in self.polyp_list:
-            print p.id,
-        print
+        #for p in self.polyp_list:
+            #print p.id,
+        #print
         
         return
     
