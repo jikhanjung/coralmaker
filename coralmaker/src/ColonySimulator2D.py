@@ -7,6 +7,13 @@ Created on Sep 21, 2013
 X_INDEX = 0
 Y_INDEX = 1
 Z_INDEX = 2
+
+ID_NONE = 0
+ID_ROUND = 1
+ID_ENCRUSTING = 2
+ID_PLATY = 3
+
+
 MAX_COLONY_SIZE = 300
 import os
 import wx
@@ -106,6 +113,8 @@ class CoralPolyp():
         depth = depth - self.pos[Z_INDEX] / 100
         vec = self.growth_vector / linalg.norm( self.growth_vector ) 
         cos_val = max( vec[Z_INDEX], 0 )
+    
+        cos_val = ( ( vec[Z_INDEX] + 1.0 ) / 2.0 ) ** 2
     
         radiance_base = self.colony.config['surface_irradiance'] * math.exp( -1 * self.colony.config['attenuation_coefficient'] * depth ) #Wm-2
         
@@ -391,7 +400,7 @@ class CoralPolyp():
         e = self.get_lower_edge_2d()
         #print e
         if e[2] < self.radius * 2:
-            if not self.colony.config['allow_encrusting']:
+            if self.colony.config['peripheral_budding'] == ID_NONE or self.colony.config['peripheral_budding'] == ID_ROUND:
                 return
 
         p = CoralPolyp( self )
@@ -547,6 +556,12 @@ class CoralPolyp():
             y1 = int( round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 )  + origin[1]
             #print "x1, y1", x1, y1
             dc.DrawCircle( x1, y1, 5)
+            x2 = int( round( self.pos[X_INDEX] + self.growth_vector[X_INDEX] * 10 ) * self.colony.config['zoom'] ) + origin[0]
+            y2 = int( round( self.pos[Z_INDEX] + self.growth_vector[Z_INDEX] * 10 ) * self.colony.config['zoom'] ) * -1 + origin[1] 
+
+            dc.SetPen(wx.Pen("blue", 1))
+            dc.DrawLine( x1, y1, x2, y2 )
+            
             txt = str( self.id ) + ": " + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 50 )
@@ -593,12 +608,12 @@ class CoralColony():
     def record_annual_growth(self):
         p = self.head_polyp
         arr = []
-        pt = wx.Point( p.pos[X_INDEX], p.pos[Z_INDEX] * -1 )
+        pt = [ p.pos[X_INDEX], p.pos[Z_INDEX] * -1 ]
         arr.append( pt)
         while p.next_polyp:
             p = p.next_polyp
             #p.record_position()
-            pt = wx.Point( p.pos[X_INDEX] , p.pos[Z_INDEX] * -1 )
+            pt = [ p.pos[X_INDEX] , p.pos[Z_INDEX] * -1 ]
             arr.append( pt )
         self.annual_shape.append( arr )
 
@@ -608,7 +623,7 @@ class CoralColony():
         for p in self.polyp_list:
             p.record_position()
 
-        print "lateral_growth_period:", self.config['lateral_growth_period']
+        #print "lateral_growth_period:", self.config['lateral_growth_period']
         if self.month % self.config['lateral_growth_period'] == 0:
             self.lateral_growth_check()
 
@@ -692,7 +707,8 @@ class CoralColony():
         for shape in self.annual_shape:
             zoomed_shape = []
             for pt in shape:
-                (x,y) = pt.Get()
+                x = pt[0]
+                y = pt[1]
                 zoomed_shape.append( wx.Point( x * self.config['zoom'], y * self.config['zoom'] ))
             dc.DrawLines( zoomed_shape, xoffset = origin[0], yoffset = origin[1] )
         #print "num polyps", len( self.polyp_list )
@@ -878,7 +894,7 @@ ID_POLYP_LISTCTRL = 1001
 ID_NEIGHBOR_LISTCTRL = 1002
 ID_TIMER_CHECKBOX= 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
-ID_ENCRUSTING_CHECKBOX= 1005
+ID_PERIPHERALBUDDING_COMBOBOX= 1005
 
 class ColonySimulator2DFrame( wx.Frame ):
     def __init__(self, parent, wid, name ):
@@ -902,8 +918,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         
         self.timer_checkbox= wx.CheckBox( self, ID_TIMER_CHECKBOX, "Use Timer" )
         self.Bind( wx.EVT_CHECKBOX, self.ToggleTimer, id=ID_TIMER_CHECKBOX)
-        self.encrusting_checkbox= wx.CheckBox( self, ID_ENCRUSTING_CHECKBOX, "Allow encrusting" )
-        self.Bind( wx.EVT_CHECKBOX, self.ToggleEncrusting, id=ID_ENCRUSTING_CHECKBOX)
+        self.peripheralbudding_combobox= wx.ComboBox( self, ID_PERIPHERALBUDDING_COMBOBOX, "Peripheral budding", choices=[ "Round", "Encrusting", "Platy" ] )
+        self.Bind( wx.EVT_COMBOBOX, self.PeripheralBudding, id=ID_PERIPHERALBUDDING_COMBOBOX)
         #self.chkShowIndex.SetValue( self.show_index)  
         #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
         #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
@@ -951,7 +967,7 @@ class ColonySimulator2DFrame( wx.Frame ):
 
         sizer2.Add( (10,10), flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
-        sizer2.Add( self.encrusting_checkbox, flag=wx.EXPAND )
+        sizer2.Add( self.peripheralbudding_combobox, flag=wx.EXPAND )
 
         sizer2.Add( self.depth_label, flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
@@ -1017,8 +1033,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.is_growing = False
         self.use_timer = True 
         self.timer_checkbox.SetValue( self.use_timer )
-        self.allow_encrusting = False
-        self.encrusting_checkbox.SetValue( self.allow_encrusting )
+        self.peripheral_budding = ID_ROUND
+        self.peripheralbudding_combobox.SetValue( "Round" )
 
         self.ResetColony()
         
@@ -1047,6 +1063,11 @@ class ColonySimulator2DFrame( wx.Frame ):
         
         return
     '''
+
+    def PeripheralBudding(self,event):
+        print "peripheral budding"
+        return
+    
     def OnPolypSelected(self,event):
         #print "on select"
         selected_list= self.polyp_listbox.GetSelections()
@@ -1083,7 +1104,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         config['growth_constant'] = float( self.forms['growth_constant'].GetValue() )
         config['polyp_radius'] = float( self.forms['polyp_radius'].GetValue() )
         config['zoom'] = float( self.forms['zoom'].GetValue() )
-        config['allow_encrusting'] = self.allow_encrusting
+        config['peripheral_budding'] = self.peripheral_budding
 
         self.colony.config = config
 
