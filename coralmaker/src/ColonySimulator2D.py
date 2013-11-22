@@ -14,7 +14,7 @@ ID_ENCRUSTING = 2
 ID_PLATY = 3
 
 
-MAX_COLONY_SIZE = 300
+MAX_COLONY_SIZE = 800
 import os
 import wx
 import sys
@@ -119,6 +119,7 @@ class CoralPolyp():
         radiance_base = self.colony.config['surface_irradiance'] * math.exp( -1 * self.colony.config['attenuation_coefficient'] * depth ) #Wm-2
         
         floor_reflection = radiance_base * self.colony.config['reflection_rate']
+        floor_reflection = 0
         direct_irradiance = radiance_base * cos_val
         
         total_irradiance = floor_reflection + direct_irradiance
@@ -142,25 +143,49 @@ class CoralPolyp():
         return
     
     def check_space(self):
-        return
-        if self.next_polyp:
-            p1 = self.pos
-            p2 = self.next_polyp.pos
-            v1 = p2 - p1
+        #return
+        if self.next_polyp :
+            p_list = [ self.pos, self.next_polyp.pos ]
+            for pos_list in [ self.pos_list, self.next_polyp.pos_list ]:
+                if len( pos_list ) > 0 :
+                    p_list.append( pos_list[-1] )
+            v1 = p_list[1] - p_list[0]
             
-            x1 = min( p1[X_INDEX], p2[X_INDEX] )
-            x2 = max( p1[X_INDEX], p2[X_INDEX] )
-            z1 = min( p1[Z_INDEX], p2[X_INDEX] )
-            z2 = min( p1[Z_INDEX], p2[Z_INDEX] )
+            x_list = [ p[X_INDEX] for p in p_list ]
+            z_list = [ p[Z_INDEX] for p in p_list ]
             
-            from_x = math.ceil(x1)
-            to_x = math.floor(x2)
-            from_z = math.ceil(z1)
-            to_z = math.floor(z2)
+            min_x = min( x_list )
+            max_x = max( x_list )
+            min_z = min( z_list )
+            max_z = max( z_list ) 
             
+            from_x = int( math.ceil(min_x) )
+            to_x = int( math.floor(max_x) )
+            if from_x > to_x:
+                temp_x = from_x
+                from_x = to_x
+                to_x = temp_x
+            from_z = int( math.ceil(min_z) )
+            to_z = int( math.floor(max_z) )
+            if from_z > to_z:
+                temp_z = from_z
+                from_z = to_z
+                to_z = temp_z
+            origin_x = int( MAX_COLONY_SIZE / 2 ) 
+            ANGLE_THRESHOLD = ( math.pi / 45 )
+            if self.selected:
+                print p_list
+                print from_x, to_x, from_z, to_z
             for x in range( from_x, to_x+1):
                 for z in range( from_z, to_z+1):
-                    pass
+                    p3 = array( [x,0,z], float )
+                    vec = p3 - p_list[0]
+                    angle = self.get_angle_between_vectors( v1, vec) 
+                    if self.selected: print x, z, angle, ANGLE_THRESHOLD
+                    if angle > 0: #math.fabs( angle ) < ANGLE_THRESHOLD:
+                        self.colony.occupied_space.append( [ x, z ] )#space[origin_x + x,z] = 1
+                        if self.selected: print "yes", x, z
+                        
             
             
             
@@ -398,9 +423,8 @@ class CoralPolyp():
     def grow_laterally(self):
         #print "grow laterally"
         e = self.get_lower_edge_2d()
-        #print e
-        if e[2] < self.radius * 2:
-            if self.colony.config['peripheral_budding'] == ID_NONE or self.colony.config['peripheral_budding'] == ID_ROUND:
+        if self.colony.config['peripheral_budding'] == ID_ROUND:
+            if e[2] < self.radius * 2:
                 return
 
         p = CoralPolyp( self )
@@ -420,42 +444,48 @@ class CoralPolyp():
             self.next_polyp = p
             self.colony.tail_polyp = p
 
-        e = self.get_lower_edge_2d()
-        #print e
-        if e[2] < self.radius * 2:
-            #print "encrusting"
-            '''encrusting'''
-            z = e[2] / 2
-            #print "z:", z
-            sign = ( e[0] / math.fabs( e[0] ) )
-            x = e[0] + ( math.sqrt(  self.radius ** 2 - z ** 2 ) ) * sign 
-            p.pos = array( [ x, 0, z ], float )
-            temp_vec = p.pos - e
-            #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
-            p.growth_vector = self.rotate( temp_vec, math.pi * sign )
-            #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
+
+        e = self.get_outer_edge_2d()
+
+        if self.colony.config['peripheral_budding'] == ID_PLATY:
+            p.growth_vector = array( [ 0,0,1],float)
+            p.pos = e + array( [ p.radius, 0, 0 ], float )
         else:
+            if e[2] > self.radius * 2:
+                ''' peripheral budding along colony surface '''
+                center = p1.get_local_center(p2)
+                v1 = p1.pos - center
+                v2 = p2.pos - center
+                #print "center", center, "v1", v1, linalg.norm( v1 ),  "v2", v2, linalg.norm( v2 )
+                theta = p1.get_angle_between_vectors(v1, v2)
+                #print "theta", theta
+                new_vec = p1.rotate( v1, theta )
+                new_vec /= linalg.norm( new_vec )
+                new_vec *= ( linalg.norm( v1 ) - linalg.norm( v2 ) ) + linalg.norm( v1 ) 
+                new_pos = center + new_vec
+                new_vec = new_vec/ linalg.norm( new_vec )
+                #print "new_vec", new_vec, "new_pos", new_pos
+                #for i in range(3):
+                    #a[i] = new_vec[0,i]
+                    #b[i] = new_pos[0,i]
+                
+                #print "new:", new_vec, new_pos, a, b, center
+                p.growth_vector = new_vec 
+                p.pos = new_pos
+            
+            else:
+                ''' only encrusting '''
+                z = e[2] / 2
+                #print "z:", z
+                sign = ( e[0] / math.fabs( e[0] ) )
+                x = e[0] + ( math.sqrt(  self.radius ** 2 - z ** 2 ) ) * sign 
+                p.pos = array( [ x, 0, z ], float )
+                temp_vec = p.pos - e
+                #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
+                p.growth_vector = self.rotate( temp_vec, math.pi * sign )
+            #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
             #print "lateral growth", p1.pos, p2.pos
             
-            center = p1.get_local_center(p2)
-            v1 = p1.pos - center
-            v2 = p2.pos - center
-            #print "center", center, "v1", v1, linalg.norm( v1 ),  "v2", v2, linalg.norm( v2 )
-            theta = p1.get_angle_between_vectors(v1, v2)
-            #print "theta", theta
-            new_vec = p1.rotate( v1, theta )
-            new_vec /= linalg.norm( new_vec )
-            new_vec *= ( linalg.norm( v1 ) - linalg.norm( v2 ) ) + linalg.norm( v1 ) 
-            new_pos = center + new_vec
-            new_vec = new_vec/ linalg.norm( new_vec )
-            #print "new_vec", new_vec, "new_pos", new_pos
-            #for i in range(3):
-                #a[i] = new_vec[0,i]
-                #b[i] = new_pos[0,i]
-            
-            #print "new:", new_vec, new_pos, a, b, center
-            p.growth_vector = new_vec 
-            p.pos = new_pos
             #pass
             #p.pos = array( [ , , ], float )
         self.colony.add_polyp(p)
@@ -474,6 +504,12 @@ class CoralPolyp():
     def get_lower_edge_2d(self):
         (e1,e2) = self.get_edge_2d()
         if e1[2] < e2[2]:
+            return e1
+        else:
+            return e2    
+    def get_outer_edge_2d(self):
+        (e1,e2) = self.get_edge_2d()
+        if self.next_polyp:
             return e1
         else:
             return e2    
@@ -531,12 +567,12 @@ class CoralPolyp():
             y1 = round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 
             pt = wx.Point( x1, y1 )
             trace.append( pt )
-            if self.selected:
-                print p
+            #if self.selected:
+                #print p
         x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) 
         y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 
-        if self.selected:
-            print self.pos
+        #if self.selected:
+        #    print self.pos
         
         pt = wx.Point( x1, y1 )
         trace.append( pt )
@@ -587,6 +623,7 @@ class CoralColony():
         self.lateral_growth_period = 1 #month
         self.annual_shape = []
         self.space = zeros( ( MAX_COLONY_SIZE, MAX_COLONY_SIZE) )
+        self.occupied_space = []
         return
         
     def add_polyp( self, p ):
@@ -599,6 +636,8 @@ class CoralColony():
     def lateral_growth_check(self):
         polyp_count = len( self.polyp_list )
         #print "polyp_count:", self.prev_polyp_count, polyp_count
+        if self.config['peripheral_budding'] == ID_NONE:
+            return
         if( float( polyp_count - self.prev_polyp_count ) / float( self.prev_polyp_count ) < self.config['lateral_growth_criterion'] ):
             self.head_polyp.grow_laterally()
             self.tail_polyp.grow_laterally()
@@ -635,6 +674,8 @@ class CoralColony():
         for p in self.polyp_list:
             if p.alive:
                 p.grow()
+        for p in self.polyp_list:
+            if p.alive:
                 p.check_space()
 
         
@@ -717,6 +758,11 @@ class CoralColony():
             if p == self.head_polyp or p == self.tail_polyp: 
                 color = "black"
             p.print_to_dc( dc, origin, color )
+
+        if self.config['show_skeleton']:
+            for p in self.occupied_space:
+                dc.SetPen(wx.Pen("yellow", 1))
+                dc.DrawPoint(p[0] * self.config['zoom'] + origin[0], -1 * p[1] * self.config['zoom'] + origin[1])
 
 '''
 for d in [ 1, 20, 50 ]:
@@ -895,6 +941,7 @@ ID_NEIGHBOR_LISTCTRL = 1002
 ID_TIMER_CHECKBOX= 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
 ID_PERIPHERALBUDDING_COMBOBOX= 1005
+ID_SHOWSKELETON_CHECKBOX= 1006
 
 class ColonySimulator2DFrame( wx.Frame ):
     def __init__(self, parent, wid, name ):
@@ -906,6 +953,7 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.growth_timer = wx.Timer(self)
         self.Bind(wx.EVT_TIMER, self.OnTimer, self.growth_timer)
         self.growth_timer.Start(self.interval)
+        self.show_skeleton = False
         
         self.ColonyView = ColonyViewControl( self, -1 )
         #self.ColonyView.SetMinSize((800,700))
@@ -916,9 +964,11 @@ class ColonySimulator2DFrame( wx.Frame ):
         #lb1 = wx.StaticText(self, wx.ID_ANY, '')
         #lb2 = wx.StaticText(self, wx.ID_ANY, '')
         
+        self.showskeleton_checkbox= wx.CheckBox( self, ID_SHOWSKELETON_CHECKBOX, "Show skeleton" )
+        self.Bind( wx.EVT_CHECKBOX, self.ToggleSkeleton, id=ID_SHOWSKELETON_CHECKBOX)
         self.timer_checkbox= wx.CheckBox( self, ID_TIMER_CHECKBOX, "Use Timer" )
         self.Bind( wx.EVT_CHECKBOX, self.ToggleTimer, id=ID_TIMER_CHECKBOX)
-        self.peripheralbudding_combobox= wx.ComboBox( self, ID_PERIPHERALBUDDING_COMBOBOX, "Peripheral budding", choices=[ "Round", "Encrusting", "Platy" ] )
+        self.peripheralbudding_combobox= wx.ComboBox( self, ID_PERIPHERALBUDDING_COMBOBOX, "Peripheral budding", choices=[ "None", "Round", "Encrusting", "Platy" ] )
         self.Bind( wx.EVT_COMBOBOX, self.PeripheralBudding, id=ID_PERIPHERALBUDDING_COMBOBOX)
         #self.chkShowIndex.SetValue( self.show_index)  
         #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
@@ -960,6 +1010,10 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.polyp_listbox = wx.ListBox( self, -1, choices=(),size=(100,200), style=wx.LB_SINGLE )
 
         sizer2 = wx.FlexGridSizer( 3, 3, 0, 0 )
+
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.showskeleton_checkbox, flag=wx.EXPAND )
 
         sizer2.Add( (10,10), flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
@@ -1065,7 +1119,9 @@ class ColonySimulator2DFrame( wx.Frame ):
     '''
 
     def PeripheralBudding(self,event):
-        print "peripheral budding"
+        idx = self.peripheralbudding_combobox.GetCurrentSelection()
+        self.colony.config['peripheral_budding'] = idx
+        #print "peripheral budding:", idx
         return
     
     def OnPolypSelected(self,event):
@@ -1104,7 +1160,11 @@ class ColonySimulator2DFrame( wx.Frame ):
         config['growth_constant'] = float( self.forms['growth_constant'].GetValue() )
         config['polyp_radius'] = float( self.forms['polyp_radius'].GetValue() )
         config['zoom'] = float( self.forms['zoom'].GetValue() )
-        config['peripheral_budding'] = self.peripheral_budding
+        #config['peripheral_budding'] = self.peripheral_budding
+        config['show_skeleton'] = self.show_skeleton
+        #print "show skeleton on reset", self.show_skeleton
+        config['peripheral_budding'] = self.peripheralbudding_combobox.GetCurrentSelection()
+        
 
         self.colony.config = config
 
@@ -1151,6 +1211,12 @@ class ColonySimulator2DFrame( wx.Frame ):
 
     def ToggleTimer(self,event):
         self.use_timer = self.timer_checkbox.GetValue()
+
+    def ToggleSkeleton(self,event):
+        #print "toggle skeleton"
+        self.show_skeleton= self.showskeleton_checkbox.GetValue()
+        self.colony.config['show_skeleton'] = self.show_skeleton
+        #print "show skeleton 1", self.show_skeleton
 
     def ToggleEncrusting(self,event):
         self.allow_encrusting = self.encrusting_checkbox.GetValue()
