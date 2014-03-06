@@ -58,6 +58,7 @@ class CoralPolyp():
         self.alive = True
         self.next_distance = 99
         self.prev_distance = 99
+        self.apical_polyp = False
         if( parent.className == "CoralColony" ):
             self.colony = parent
         else:
@@ -136,6 +137,9 @@ class CoralPolyp():
     def grow(self):
         irradiance = self.get_irradiance()
         growth_rate = 1 - math.exp( -1.0 * irradiance * self.colony.config['growth_constant'] ) 
+        
+        if self.colony.config['determinate_growth'] == True and self.apical_polyp == False:
+            growth_rate = growth_rate * math.exp( -1.0 * ( self.age_in_month / 12 ) ) 
         self.growth_rate = growth_rate
         self.pos += ( self.growth_vector / linalg.norm( self.growth_vector ) ) * growth_rate
         self.age_in_month += 1
@@ -184,7 +188,7 @@ class CoralPolyp():
                     if self.selected: print x, z, angle, ANGLE_THRESHOLD
                     if angle > 0: #math.fabs( angle ) < ANGLE_THRESHOLD:
                         self.colony.occupied_space.append( [ x, z ] )#space[origin_x + x,z] = 1
-                        if self.selected: print "yes", x, z
+                        #if self.selected: print "yes", x, z
                         
             
             
@@ -421,11 +425,16 @@ class CoralPolyp():
         
 
     def grow_laterally(self):
-        #print "grow laterally"
+        print "grow laterally"
         e = self.get_lower_edge_2d()
+        print "peripheral budding", self.colony.config['peripheral_budding']
         if self.colony.config['peripheral_budding'] == ID_ROUND:
+            print "round"
             if e[2] < self.radius * 2:
                 return
+
+        e = self.get_outer_edge_2d()
+        print "outer edge:", e
 
         p = CoralPolyp( self )
 
@@ -445,12 +454,13 @@ class CoralPolyp():
             self.colony.tail_polyp = p
 
 
-        e = self.get_outer_edge_2d()
-
         if self.colony.config['peripheral_budding'] == ID_PLATY:
+            print "platy"
             p.growth_vector = array( [ 0,0,1],float)
-            p.pos = e + array( [ p.radius, 0, 0 ], float )
+            sign = ( e[0] / math.fabs( e[0] ) )
+            p.pos = e + array( [ sign * p.radius, 0, 0 ], float )
         else:
+            print "not platy"
             if e[2] > self.radius * 2:
                 ''' peripheral budding along colony surface '''
                 center = p1.get_local_center(p2)
@@ -474,23 +484,25 @@ class CoralPolyp():
                 p.pos = new_pos
             
             else:
+                print "should be encrusting"
                 ''' only encrusting '''
                 z = e[2] / 2
-                #print "z:", z
+                print "z:", z
+                print 
                 sign = ( e[0] / math.fabs( e[0] ) )
                 x = e[0] + ( math.sqrt(  self.radius ** 2 - z ** 2 ) ) * sign 
                 p.pos = array( [ x, 0, z ], float )
                 temp_vec = p.pos - e
                 #p.growth_vector = array( [ sign * temp_vec[2], 0, temp_vec[0] ], float ) 
                 p.growth_vector = self.rotate( temp_vec, math.pi * sign )
-            #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
-            #print "lateral growth", p1.pos, p2.pos
+        #print "lateral:", self.pos, self.growth_vector, "new lateral:", p.pos, p.growth_vector
+        #print "lateral growth", p1.pos, p2.pos
             
             #pass
             #p.pos = array( [ , , ], float )
         self.colony.add_polyp(p)
-        #print "lateral:", self.id, self.pos, self.growth_vector, "new lateral:", p.id, p.pos, p.growth_vector
-        #print "lateral:", p1.pos, p2.pos, p.pos
+        print "lateral:", self.id, self.pos, self.growth_vector, "new lateral:", p.id, p.pos, p.growth_vector
+        print "lateral:", p1.pos, p2.pos, p.pos
     
     def get_edge_2d(self):
         center = self.pos
@@ -624,6 +636,7 @@ class CoralColony():
         self.annual_shape = []
         self.space = zeros( ( MAX_COLONY_SIZE, MAX_COLONY_SIZE) )
         self.occupied_space = []
+        self.apical_polyp_list = []
         return
         
     def add_polyp( self, p ):
@@ -662,6 +675,7 @@ class CoralColony():
         for p in self.polyp_list:
             p.record_position()
 
+        self.month += 1
         #print "lateral_growth_period:", self.config['lateral_growth_period']
         if self.month % self.config['lateral_growth_period'] == 0:
             self.lateral_growth_check()
@@ -669,7 +683,6 @@ class CoralColony():
         if self.month % 12 == 0:
             self.record_annual_growth()
             
-        self.month += 1
 
         for p in self.polyp_list:
             if p.alive:
@@ -697,6 +710,20 @@ class CoralColony():
         for p in self.polyp_list:
             if p.alive:
                 p.check_dead_or_alive()
+
+        if len( self.apical_polyp_list ) > 0:
+            print "apical polyp!"
+            for p in self.polyp_list:
+                if p.alive and p.apical_polyp == False:
+                    min_dist = p.radius * 20
+                    for ap in self.apical_polyp_list:
+                        dist = p.get_distance( ap )
+                        if dist < min_dist: 
+                            min_dist = dist
+                            
+                    if min_dist == p.radius * 20:
+                        p.apical_polyp = True
+                        self.apical_polyp_list.append( p )
 
         #for p in self.polyp_list:
             #print p.id,
@@ -942,6 +969,7 @@ ID_TIMER_CHECKBOX= 1003
 ID_CHK_ENHANCE_VERTICAL_GROWTH = 1004
 ID_PERIPHERALBUDDING_COMBOBOX= 1005
 ID_SHOWSKELETON_CHECKBOX= 1006
+ID_DETERMINATEGROWTH_CHECKBOX= 1007
 
 class ColonySimulator2DFrame( wx.Frame ):
     def __init__(self, parent, wid, name ):
@@ -964,6 +992,8 @@ class ColonySimulator2DFrame( wx.Frame ):
         #lb1 = wx.StaticText(self, wx.ID_ANY, '')
         #lb2 = wx.StaticText(self, wx.ID_ANY, '')
         
+        self.determinategrowth_checkbox= wx.CheckBox( self, ID_DETERMINATEGROWTH_CHECKBOX, "Determinate growth" )
+        self.Bind( wx.EVT_CHECKBOX, self.ToggleDeterminate, id=ID_DETERMINATEGROWTH_CHECKBOX)
         self.showskeleton_checkbox= wx.CheckBox( self, ID_SHOWSKELETON_CHECKBOX, "Show skeleton" )
         self.Bind( wx.EVT_CHECKBOX, self.ToggleSkeleton, id=ID_SHOWSKELETON_CHECKBOX)
         self.timer_checkbox= wx.CheckBox( self, ID_TIMER_CHECKBOX, "Use Timer" )
@@ -1010,6 +1040,10 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.polyp_listbox = wx.ListBox( self, -1, choices=(),size=(100,200), style=wx.LB_SINGLE )
 
         sizer2 = wx.FlexGridSizer( 3, 3, 0, 0 )
+
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( (10,10), flag=wx.EXPAND )
+        sizer2.Add( self.determinategrowth_checkbox, flag=wx.EXPAND )
 
         sizer2.Add( (10,10), flag=wx.EXPAND )
         sizer2.Add( (10,10), flag=wx.EXPAND )
@@ -1085,10 +1119,12 @@ class ColonySimulator2DFrame( wx.Frame ):
         self.SetSizer(fs)
         
         self.is_growing = False
+        self.determinate_growth = False
+        self.determinategrowth_checkbox.SetValue( self.determinate_growth)
         self.use_timer = True 
         self.timer_checkbox.SetValue( self.use_timer )
         self.peripheral_budding = ID_ROUND
-        self.peripheralbudding_combobox.SetValue( "Round" )
+        self.peripheralbudding_combobox.SetStringSelection( "Round" )
 
         self.ResetColony()
         
@@ -1121,7 +1157,7 @@ class ColonySimulator2DFrame( wx.Frame ):
     def PeripheralBudding(self,event):
         idx = self.peripheralbudding_combobox.GetCurrentSelection()
         self.colony.config['peripheral_budding'] = idx
-        #print "peripheral budding:", idx
+        print "peripheral budding:", idx
         return
     
     def OnPolypSelected(self,event):
@@ -1162,12 +1198,28 @@ class ColonySimulator2DFrame( wx.Frame ):
         config['zoom'] = float( self.forms['zoom'].GetValue() )
         #config['peripheral_budding'] = self.peripheral_budding
         config['show_skeleton'] = self.show_skeleton
+        config['determinate_growth'] = self.determinate_growth
         #print "show skeleton on reset", self.show_skeleton
         config['peripheral_budding'] = self.peripheralbudding_combobox.GetCurrentSelection()
-        
+        #print "peripheral_budding on reset colony", config['peripheral_budding']
 
         self.colony.config = config
+        
+        #pos_list = [ [ -9, 0, 0 ], [-5, 0, 3 ], [ 0, 0, 5 ], [5, 0, 3], [9, 0, 0 ] ]
+        #vec_list = [ array( [ -1, 0, 0.01 ], float ), array( [ -1, 0, 1 ], float ), array( [ 0, 0, 1 ], float ) , array( [ 1, 0, 1 ], float ),array( [ 1, 0, 0.01 ], float ) ]
 
+        #pos_list = [ [-5, 0, 3 ], [ 0, 0, 5 ], [5, 0, 3] ]
+        #vec_list = [ array( [ -1, 0, 1 ], float ), array( [ 0, 0, 1 ], float ) ,  array( [ 1, 0, 1 ], float ) ]
+
+        pos_list = [ [-2, 0, 3 ], [2, 0, 3] ]
+        vec_list = [ array( [ -1, 0, 1 ], float ), array( [ 1, 0, 1 ], float ) ]
+        
+        for i in xrange( len( pos_list ) ):
+            p = CoralPolyp( self.colony, pos = array( pos_list[i], float ) )
+            p.growth_vector = vec_list[i] / linalg.norm( vec_list[i] )
+            self.colony.add_polyp( p )
+        
+        """
         x_pos = [ -9, -5, 0, 5, 9 ]
         y_pos = [ 0, 0, 0, 0, 0 ]
         z_pos = [ 0, 3, 5, 3, 0]
@@ -1175,12 +1227,16 @@ class ColonySimulator2DFrame( wx.Frame ):
         
         
         for i in xrange( 5 ):
-            p = CoralPolyp( self.colony, pos = array( [ x_pos[i], y_pos[i], z_pos[i] ], float ) )
+            p = CoralPolyp( self.colony, pos = array( pos_list[i], float ) )
             p.growth_vector = grow_vector[i] / linalg.norm( grow_vector[i] )
             self.colony.add_polyp( p )
-            
+        """    
         #colony.prev_polyp_count = 3
         self.colony.init_colony_2d()
+        
+        #self.colony.apical_polyp_list.append( self.colony.head_polyp.next_polyp )
+        #self.colony.head_polyp.next_polyp.apical_polyp = True
+        
 
         self.ColonyView.SetColony( self.colony )
         self.ColonyView.Reset()
@@ -1212,10 +1268,14 @@ class ColonySimulator2DFrame( wx.Frame ):
     def ToggleTimer(self,event):
         self.use_timer = self.timer_checkbox.GetValue()
 
+    def ToggleDeterminate(self,event):
+        self.determinate_growth= self.determinategrowth_checkbox.GetValue()
+
     def ToggleSkeleton(self,event):
         #print "toggle skeleton"
         self.show_skeleton= self.showskeleton_checkbox.GetValue()
         self.colony.config['show_skeleton'] = self.show_skeleton
+        self.ColonyView.DrawToBuffer()
         #print "show skeleton 1", self.show_skeleton
 
     def ToggleEncrusting(self,event):
