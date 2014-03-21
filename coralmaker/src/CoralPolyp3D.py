@@ -3,19 +3,19 @@ Created on Mar 9, 2014
 
 @author: jikhanjung
 '''
-import os
+#import os
 import wx
-import sys
+#import sys
 #import random
 import math
-from numpy import *
-from opengltest import MdCanvas
-import Image, ImageDraw
-from CoralConfig3D import *
+from numpy import array, linalg, dot, matrix, cross, squeeze, asarray
+#from opengltest import MdCanvas
+import ImageDraw
+import CoralConfig3D as ccfg
 
 
 class CoralPolyp():
-    def __init__(self, parent, pid=-1, pos = array( [0,0,0], float ), radius = POLYP_RADIUS, height = 1 ):
+    def __init__(self, parent, pid=-1, pos = array( [0,0,0], float ), radius = ccfg.POLYP_RADIUS, height = 1 ):
         self.id = pid
         self.className = "CoralPolyp"
         self.x = 0
@@ -58,7 +58,7 @@ class CoralPolyp():
             if polyp.id == self.id:
                 pass
             dist = self.get_distance( polyp )
-            if dist >= NEIGHBOR_DISTANCE_MULTIPLIER * self.radius: 
+            if dist >= ccfg.NEIGHBOR_DISTANCE_MULTIPLIER * self.radius: 
                 pass
             else:
                 self.neighbor_list.append( polyp )
@@ -73,7 +73,7 @@ class CoralPolyp():
     def _get_irradiance(self):
         depth = self.get_depth()
         vec = self.grow_vector / linalg.norm( self.grow_vector ) 
-        cos_val = vec[Z_INDEX]
+        cos_val = vec[ccfg.Z_INDEX]
         #print cos_val
 
         radiance_base = self.config['surface_irradiance'] * math.exp( -1 * self.config['attenuation_coefficient'] * depth ) #Wm-2
@@ -92,15 +92,15 @@ class CoralPolyp():
     
     def get_irradiance( self ):
         depth = self.get_depth()
-        depth = depth - self.pos[Z_INDEX] / 100
+        depth = depth - self.pos[ccfg.Z_INDEX] / 100
         vec = self.growth_vector / linalg.norm( self.growth_vector ) 
-        cos_val = max( vec[Z_INDEX], 0 )
+        #cos_val = max( vec[ccfg.Z_INDEX], 0 )
     
-        cos_val = ( ( vec[Z_INDEX] + 1.0 ) / 2.0 ) ** 2
+        cos_val = ( ( vec[ccfg.Z_INDEX] + 1.0 ) / 2.0 ) ** 2
     
         radiance_base = self.colony.config['surface_irradiance'] * math.exp( -1 * self.colony.config['attenuation_coefficient'] * depth ) #Wm-2
         
-        floor_reflection = radiance_base * self.colony.config['reflection_rate']
+        #floor_reflection = radiance_base * self.colony.config['reflection_rate']
         floor_reflection = 0
         direct_irradiance = radiance_base * cos_val
         
@@ -136,8 +136,8 @@ class CoralPolyp():
                     p_list.append( pos_list[-1] )
             v1 = p_list[1] - p_list[0]
             
-            x_list = [ p[X_INDEX] for p in p_list ]
-            z_list = [ p[Z_INDEX] for p in p_list ]
+            x_list = [ p[ccfg.X_INDEX] for p in p_list ]
+            z_list = [ p[ccfg.Z_INDEX] for p in p_list ]
             
             min_x = min( x_list )
             max_x = max( x_list )
@@ -156,7 +156,7 @@ class CoralPolyp():
                 temp_z = from_z
                 from_z = to_z
                 to_z = temp_z
-            origin_x = int( MAX_COLONY_SIZE / 2 ) 
+            #origin_x = int( ccfg.MAX_COLONY_SIZE / 2 ) 
             ANGLE_THRESHOLD = ( math.pi / 45 )
             if self.selected:
                 print p_list
@@ -197,7 +197,7 @@ class CoralPolyp():
 
     def check_dead_or_alive(self):
         #print "check die"
-        if self.pos[Z_INDEX] <= 0 and self.growth_vector[Z_INDEX] < 0:
+        if self.pos[ccfg.Z_INDEX] <= 0 and self.growth_vector[ccfg.Z_INDEX] < 0:
             print self.id, self.pos,self.growth_vector 
             self.die()
             
@@ -224,6 +224,7 @@ class CoralPolyp():
             return True
         return False
     
+    '''
     def find_bud_loc_2d_new(self, neighboring_polyp):
         v1 = self.growth_vector
         v2 = neighboring_polyp.growth_vector
@@ -235,7 +236,7 @@ class CoralPolyp():
         cos_theta = dot( v1, v2 ) / ( linalg.norm( v1 ) * linalg.norm( v2 ) )#p1.
         theta = math.acos( cos_theta )
         new_growth_vector = self.rotate( v1, theta )
-        
+    '''    
     def rotate(self,vec,theta):
         #rotation_matrix = matrix( [ [ math.cos( theta ), 0, math.sin( theta )] , [-1 * math.sin(theta ), 1, math.cos(theta) ], [ 0, 0, 1 ]])
         rotation_matrix = matrix( [ [ math.cos( theta ), 0, math.sin( theta )] , 
@@ -251,7 +252,7 @@ class CoralPolyp():
     def get_angle_between_vectors(self, v1, v2 ):
         
         cross_product = cross( v1, v2 )
-        sin_theta = cross_product[Y_INDEX] / ( linalg.norm( v1 ) * linalg.norm( v2 ) )
+        sin_theta = cross_product[ccfg.Y_INDEX] / ( linalg.norm( v1 ) * linalg.norm( v2 ) )
 
         #if sin_theta > 0:
             #print "plus"
@@ -288,7 +289,7 @@ class CoralPolyp():
             #print "theta", theta * 180 / math.pi
             theta = theta * 1.2
             #print "theta", theta* 180 / math.pi
-            new_growth_vector = self.rotate( p.growth_vector, -1.0 * theta )
+            #new_growth_vector = self.rotate( p.growth_vector, -1.0 * theta )
             #print "divergent growth vector", ( p.growth_vector / linalg.norm( p.growth_vector ) ), ( np.growth_vector / linalg.norm( np.growth_vector ) ), ( new_growth_vector / linalg.norm( new_growth_vector ) )
             #np.growth_vector = new_growth_vector
 
@@ -410,7 +411,7 @@ class CoralPolyp():
         print "grow laterally"
         e = self.get_lower_edge_2d()
         print "peripheral budding", self.colony.config['peripheral_budding']
-        if self.colony.config['peripheral_budding'] == ID_ROUND:
+        if self.colony.config['peripheral_budding'] == ccfg.ID_ROUND:
             print "round"
             if e[2] < self.radius * 2:
                 return
@@ -436,7 +437,7 @@ class CoralPolyp():
             self.colony.tail_polyp = p
 
 
-        if self.colony.config['peripheral_budding'] == ID_PLATY:
+        if self.colony.config['peripheral_budding'] == ccfg.ID_PLATY:
             print "platy"
             p.growth_vector = array( [ 0,0,1],float)
             sign = ( e[0] / math.fabs( e[0] ) )
@@ -519,8 +520,8 @@ class CoralPolyp():
         if self.next_polyp:
             arr = []
             for p in [ self.pos, self.next_polyp.pos ]:
-                arr.append( round( p[X_INDEX] * self.colony.config['zoom'] ) + origin[0] )
-                arr.append( round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
+                arr.append( round( p[ccfg.X_INDEX] * self.colony.config['zoom'] ) + origin[0] )
+                arr.append( round( p[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1] )
             imgdr.line( arr, fill = color )
 
         #imgdr.line( arr, fill = color )
@@ -534,18 +535,17 @@ class CoralPolyp():
 
         #dc.SetBackground(wx.Brush(self.GetBackgroundColour()))
         #dc.Clear()
-        dw, dh = dc.GetSize()
+        #dw, dh = dc.GetSize()
 
         dc.SetPen(wx.Pen("black", 1))
         #print "zoom 1", self.colony.config['zoom']
 
         if self.next_polyp:
             #print "next polyp"
-            arr = []
-            x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
-            y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
-            x2 = round( self.next_polyp.pos[X_INDEX] * self.colony.config['zoom'] ) + origin[0]
-            y2 = round( self.next_polyp.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+            x1 = round( self.pos[ccfg.X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+            y1 = round( self.pos[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
+            x2 = round( self.next_polyp.pos[ccfg.X_INDEX] * self.colony.config['zoom'] ) + origin[0]
+            y2 = round( self.next_polyp.pos[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 + origin[1]
             #print "draw line"
             dc.SetPen(wx.Pen("green", 1))
             dc.DrawLine( x1, y1, x2, y2 )
@@ -557,14 +557,14 @@ class CoralPolyp():
         #print self.annual_pos_list
         dc.SetPen(wx.Pen("black", 1))
         for p in self.pos_list:
-            x1 = round( p[X_INDEX] * self.colony.config['zoom'] ) 
-            y1 = round( p[Z_INDEX] * self.colony.config['zoom'] ) * -1 
+            x1 = round( p[ccfg.X_INDEX] * self.colony.config['zoom'] ) 
+            y1 = round( p[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 
             pt = wx.Point( x1, y1 )
             trace.append( pt )
             #if self.selected:
                 #print p
-        x1 = round( self.pos[X_INDEX] * self.colony.config['zoom'] ) 
-        y1 = round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 
+        x1 = round( self.pos[ccfg.X_INDEX] * self.colony.config['zoom'] ) 
+        y1 = round( self.pos[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 
         #if self.selected:
         #    print self.pos
         
@@ -582,20 +582,20 @@ class CoralPolyp():
         if self.selected:
             #print "selected", self.id
             dc.SetPen(wx.Pen("red", 1))
-            x1 = int( round( self.pos[X_INDEX] * self.colony.config['zoom'] ) ) + origin[0] 
-            y1 = int( round( self.pos[Z_INDEX] * self.colony.config['zoom'] ) * -1 )  + origin[1]
+            x1 = int( round( self.pos[ccfg.X_INDEX] * self.colony.config['zoom'] ) ) + origin[0] 
+            y1 = int( round( self.pos[ccfg.Z_INDEX] * self.colony.config['zoom'] ) * -1 )  + origin[1]
             #print "x1, y1", x1, y1
             dc.DrawCircle( x1, y1, 5)
-            x2 = int( round( self.pos[X_INDEX] + self.growth_vector[X_INDEX] * 10 ) * self.colony.config['zoom'] ) + origin[0]
-            y2 = int( round( self.pos[Z_INDEX] + self.growth_vector[Z_INDEX] * 10 ) * self.colony.config['zoom'] ) * -1 + origin[1] 
+            x2 = int( round( self.pos[ccfg.X_INDEX] + self.growth_vector[ccfg.X_INDEX] * 10 ) * self.colony.config['zoom'] ) + origin[0]
+            y2 = int( round( self.pos[ccfg.Z_INDEX] + self.growth_vector[ccfg.Z_INDEX] * 10 ) * self.colony.config['zoom'] ) * -1 + origin[1] 
 
             dc.SetPen(wx.Pen("blue", 1))
             dc.DrawLine( x1, y1, x2, y2 )
             
-            txt = str( self.id ) + ": " + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[X_INDEX], self.pos[Z_INDEX] ] ] )
+            txt = str( self.id ) + ": " + ", ".join( [ str( round( x * 10 ) / 10.0 ) for x in [ self.pos[ccfg.X_INDEX], self.pos[ccfg.Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 50 )
-            txt = ", ".join( [ str( round( x * 100 ) / 100.0 ) for x in [ self.growth_vector[X_INDEX], self.growth_vector[Z_INDEX] ] ] )
+            txt = ", ".join( [ str( round( x * 100 ) / 100.0 ) for x in [ self.growth_vector[ccfg.X_INDEX], self.growth_vector[ccfg.Z_INDEX] ] ] )
             #print txt
             dc.DrawText( txt, x1 - 30, y1 - 65 )
             irradiance = round( self.irradiance * 100 ) / 100.0 

@@ -3,18 +3,16 @@ Created on Mar 6, 2014
 
 @author: jikhanjung
 '''
-import os
 import wx
 import sys
 #import random
-import math
-from numpy import *
+from numpy import array, linalg
 from ColonyViewer3D import ColonyViewControl
-import Image, ImageDraw
+import Image
 
 from CoralPolyp3D import CoralPolyp
 from CoralColony3D import CoralColony
-from CoralConfig3D import *
+import CoralConfig3D 
 #from ColonyViewer3D import ColonyViewControl
 
 
@@ -71,25 +69,25 @@ class ColonySimulator3DFrame( wx.Frame ):
         self.irradiance_value = wx.TextCtrl(self, -1, '' )
 
         self.depth_label = wx.StaticText(self, -1, 'Depth', style=wx.ALIGN_RIGHT)
-        self.forms['depth'] = wx.TextCtrl(self, -1, str( DEPTH ) )
+        self.forms['depth'] = wx.TextCtrl(self, -1, str( CoralConfig3D.DEPTH ) )
         self.lateral_growth_period_label = wx.StaticText(self, -1, 'Lat. Growth Period', style=wx.ALIGN_RIGHT)
-        self.forms['lateral_growth_period'] = wx.TextCtrl(self, -1, str( LATERAL_GROWTH_PERIOD ) )
+        self.forms['lateral_growth_period'] = wx.TextCtrl(self, -1, str( CoralConfig3D.LATERAL_GROWTH_PERIOD ) )
         self.lateral_growth_criterion_label = wx.StaticText(self, -1, 'Lat. Growth Criterion', style=wx.ALIGN_RIGHT)
-        self.forms['lateral_growth_criterion'] = wx.TextCtrl(self, -1, str( LATERAL_GROWTH_CRITERION ) )
+        self.forms['lateral_growth_criterion'] = wx.TextCtrl(self, -1, str( CoralConfig3D.LATERAL_GROWTH_CRITERION ) )
         self.surface_irradiance_label = wx.StaticText(self, -1, 'Surface Irradiance', style=wx.ALIGN_RIGHT)
-        self.forms['surface_irradiance'] = wx.TextCtrl(self, -1, str( SURFACE_IRRADIANCE ) )
+        self.forms['surface_irradiance'] = wx.TextCtrl(self, -1, str( CoralConfig3D.SURFACE_IRRADIANCE ) )
         self.attenuation_coefficient_label = wx.StaticText(self, -1, 'Attenuation Coeff.', style=wx.ALIGN_RIGHT)
-        self.forms['attenuation_coefficient'] = wx.TextCtrl(self, -1, str( ATTENUATION_COEFFICIENT) )
+        self.forms['attenuation_coefficient'] = wx.TextCtrl(self, -1, str( CoralConfig3D.ATTENUATION_COEFFICIENT) )
         self.max_irradiance_label = wx.StaticText(self, -1, 'Max Irradiance', style=wx.ALIGN_RIGHT)
-        self.forms['max_irradiance'] = wx.TextCtrl(self, -1, str( MAX_IRRADIANCE ) )
+        self.forms['max_irradiance'] = wx.TextCtrl(self, -1, str( CoralConfig3D.MAX_IRRADIANCE ) )
         self.reflection_rate_label = wx.StaticText(self, -1, 'Reflection Rate', style=wx.ALIGN_RIGHT)
-        self.forms['reflection_rate'] = wx.TextCtrl(self, -1, str( REFLECTION_RATE ) )
+        self.forms['reflection_rate'] = wx.TextCtrl(self, -1, str( CoralConfig3D.REFLECTION_RATE ) )
         self.growth_constant_label = wx.StaticText(self, -1, 'Growth constant', style=wx.ALIGN_RIGHT)
-        self.forms['growth_constant'] = wx.TextCtrl(self, -1, str( GROWTH_CONSTANT ) )
+        self.forms['growth_constant'] = wx.TextCtrl(self, -1, str( CoralConfig3D.GROWTH_CONSTANT ) )
         self.polyp_radius_label = wx.StaticText(self, -1, 'Polyp radius', style=wx.ALIGN_RIGHT)
-        self.forms['polyp_radius'] = wx.TextCtrl(self, -1, str( POLYP_RADIUS ) )
+        self.forms['polyp_radius'] = wx.TextCtrl(self, -1, str( CoralConfig3D.POLYP_RADIUS ) )
         self.zoom_label = wx.StaticText(self, -1, 'Zoom', style=wx.ALIGN_RIGHT)
-        self.forms['zoom'] = wx.TextCtrl(self, -1, str( ZOOM ) )
+        self.forms['zoom'] = wx.TextCtrl(self, -1, str( CoralConfig3D.ZOOM ) )
         
         self.polyp_list_label = wx.StaticText(self, -1, 'Polyps', style=wx.ALIGN_RIGHT)
         self.polyp_listbox = wx.ListBox( self, -1, choices=(),size=(100,200), style=wx.LB_SINGLE )
@@ -178,7 +176,7 @@ class ColonySimulator3DFrame( wx.Frame ):
         self.determinategrowth_checkbox.SetValue( self.determinate_growth)
         self.use_timer = True 
         self.timer_checkbox.SetValue( self.use_timer )
-        self.peripheral_budding = ID_ROUND
+        self.peripheral_budding = CoralConfig3D.ID_ROUND
         self.peripheralbudding_combobox.SetStringSelection( "Round" )
 
         self.ResetColony()

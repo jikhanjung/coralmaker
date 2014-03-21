@@ -8,18 +8,13 @@ Created on Mar 9, 2014
 
 @author: jikhanjung
 '''
-import os
-import wx
-import sys
-# import random
-import math
-from numpy import *
+#from numpy import *
 from opengltest import MdCanvas
-import Image, ImageDraw
+#import Image, ImageDraw
 
-from CoralPolyp3D import CoralPolyp
-from CoralColony3D import CoralColony
-from CoralConfig3D import *
+#from CoralPolyp3D import CoralPolyp
+#from CoralColony3D import CoralColony
+#from CoralConfig3D import *
 
 '''------'''
 
@@ -27,12 +22,15 @@ import wx
 import sys
 import math
 
-from time import clock
+#from time import clock
 from wx import glcanvas
-import OpenGL.platform.win32
-from OpenGL.GL import *
-from OpenGL.GLUT import *
-from OpenGL.GLU import *
+#import OpenGL.platform.win32
+import OpenGL.GL as gl
+import OpenGL.GLUT as glut
+import OpenGL.GLU as glu
+#from OpenGL.GL import *
+#from OpenGL.GLUT import *
+#from OpenGL.GLU import *
 # from OpenGL.plugins import PlatformPlugin, FormatHandler
 class MdColorScheme:
     def __init__(self):
@@ -182,7 +180,7 @@ class ColonyViewBase(glcanvas.GLCanvas):
         size = self.size = s
         if self.GetContext():
             self.SetCurrent()
-            glViewport(0, 0, size.width, size.height)
+            gl.glViewport(0, 0, size.width, size.height)
             
             # Maintain 1:1 Aspect Ratio  
             """
@@ -199,8 +197,8 @@ class ColonyViewBase(glcanvas.GLCanvas):
             elif size.height > size.width:
                 height = height * (h / w)
             # print width, "x", height
-            glMatrixMode(GL_PROJECTION)
-            glLoadIdentity()
+            gl.glMatrixMode(gl.GL_PROJECTION)
+            gl.glLoadIdentity()
             # print "zoom", self.zoom
             
             znear = 0.1
@@ -216,12 +214,12 @@ class ColonyViewBase(glcanvas.GLCanvas):
             #        bottom_height += height
             #        top_height += height
             
-            glFrustum(-width, width, bottom_height, top_height, znear, zfar)
-            gluLookAt(0.0, 0.0, self.offset * -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+            gl.glFrustum(-width, width, bottom_height, top_height, znear, zfar)
+            glu.gluLookAt(0.0, 0.0, self.offset * -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
             # print 
             # print "width height near far offset", width, height, znear, zfar, self.offset
             # print self.r
-            glMatrixMode(GL_MODELVIEW)  # switch back to model view
+            gl.glMatrixMode(gl.GL_MODELVIEW)  # switch back to model view
             
         event.Skip()
     
@@ -233,6 +231,7 @@ class ColonyViewBase(glcanvas.GLCanvas):
             self.InitGL()
             self.init = True
         self.OnDraw()
+        print dc
         
 class ColonyViewControl(ColonyViewBase):
 
@@ -256,18 +255,18 @@ class ColonyViewControl(ColonyViewBase):
         
         length = (axis_end[0] ** 2 + axis_end[1] ** 2 + axis_end[2] ** 2) ** 0.5
         radius = self.wire_radius
-        cyl = gluNewQuadric()
-        glPushMatrix()
-        glLoadIdentity()
+        cyl = glu.gluNewQuadric()
+        gl.glPushMatrix()
+        gl.glLoadIdentity()
         # glTranslate(0, 0, self.offset)
-        glRotatef(yangle, 1.0, 0.0, 0.0)
-        glRotatef(xangle, 0.0, 1.0, 0.0)
-        glTranslate(lm2.pos[0], lm2.pos[1], lm2.pos[2])
+        gl.glRotatef(yangle, 1.0, 0.0, 0.0)
+        gl.glRotatef(xangle, 0.0, 1.0, 0.0)
+        gl.glTranslate(lm2.pos[0], lm2.pos[1], lm2.pos[2])
         if (angle != 0):
-            glRotate(angle, axis_rotation[0], axis_rotation[1], axis_rotation[2])
+            gl.glRotate(angle, axis_rotation[0], axis_rotation[1], axis_rotation[2])
         
-        gluCylinder(cyl, radius, radius, length, 10, 10)
-        glPopMatrix()
+        glu.gluCylinder(cyl, radius, radius, length, 10, 10)
+        gl.glPopMatrix()
     
     def SelectLandmark(self, idx_list):
         for i in range(len(self.object.landmarks)):
@@ -295,47 +294,47 @@ class ColonyViewControl(ColonyViewBase):
     
     def DrawColony(self, colony, xangle, yangle, size=0.1, color=(1.0, 1.0, 0.0), show_index=False, single_object_mode=True):
         # print "draw colony:"#, object.objname
-        original_color = color
+        #original_color = color
         # i = 0
-        glColor3f(color[0], color[1], color[2])
-        glLoadIdentity()
-        glPushMatrix()
+        gl.glColor3f(color[0], color[1], color[2])
+        gl.glLoadIdentity()
+        gl.glPushMatrix()
         # glTranslate(0, 0, self.offset)
-        glRotatef(yangle, 1.0, 0.0, 0.0)
-        glRotatef(xangle, 0.0, 1.0, 0.0)
+        gl.glRotatef(yangle, 1.0, 0.0, 0.0)
+        gl.glRotatef(xangle, 0.0, 1.0, 0.0)
         
         #    single_object_mode = True
         if not single_object_mode:
             # print "point size, glbegin"
-            glPointSize(3)
-            glDisable(GL_LIGHTING)
-            glBegin(GL_POINTS)
+            gl.glPointSize(3)
+            gl.glDisable(gl.GL_LIGHTING)
+            gl.glBegin(gl.GL_POINTS)
         
         for cr in colony.polyp_list:
             if cr.dead:
                 # continue
                 # glColor3f( self.color.selected_landmark[0], self.color.selected_landmark[1], self.color.selected_landmark[2] )
-                glColor3f(0.1, 0.1, 0.1)
+                gl.glColor3f(0.1, 0.1, 0.1)
             elif cr.selected:
                 # print cr.id, "selected"
-                glColor3f(0.5, 0.5, 0.0)
+                gl.glColor3f(0.5, 0.5, 0.0)
             elif cr.is_neighbor:
                 # print cr.id, "neighbor"
-                glColor3f(0.2, 0.2, 0.5)
+                gl.glColor3f(0.2, 0.2, 0.5)
             else:
-                glColor3f(color[0], color[1], color[2])
+                gl.glColor3f(color[0], color[1], color[2])
             
             if single_object_mode:
-                glPushMatrix()
-                glTranslate(cr.pos[0], cr.pos[1], cr.pos[2])
+                gl.glPushMatrix()
+                gl.glTranslate(cr.pos[0], cr.pos[1], cr.pos[2])
                 if cr.dead:
-                    glutSolidSphere(0.2 , 20, 20)  # glutSolidCube( size )
+                    glut.glutSolidSphere(0.2 , 20, 20)  # glutSolidCube( size )
                 else:
-                    glutSolidSphere(0.3, 20, 20)  # glutSolidCube( size )
+                    glut.glutSolidSphere(0.3, 20, 20)  # glutSolidCube( size )
                 
-                glPopMatrix()
+                gl.glPopMatrix()
             else:
-                glVertex3f(cr.pos[0], cr.pos[1], cr.pos[2])
+                gl.glVertex3f(cr.pos[0], cr.pos[1], cr.pos[2])
                 
             
             # if cr.selected:
@@ -343,29 +342,29 @@ class ColonyViewControl(ColonyViewBase):
           
         if not single_object_mode:
             # print "glend"
-            glEnd()
-            glEnable(GL_LIGHTING)
+            gl.glEnd()
+            gl.glEnable(gl.GL_LIGHTING)
         
         if show_index:
             i = 0
             for cr in colony.polyp_list:
                 i += 1
                 if cr.dead: continue
-                glDisable(GL_LIGHTING)
-                glColor3f(.5, .5, 1.0)
-                glRasterPos3f(cr.pos[0], cr.pos[1] + size * 2, cr.pos[2])
+                gl.glDisable(gl.GL_LIGHTING)
+                gl.glColor3f(.5, .5, 1.0)
+                gl.glRasterPos3f(cr.pos[0], cr.pos[1] + size * 2, cr.pos[2])
                 for letter in list(str(i)):
-                    glutBitmapCharacter(GLUT_BITMAP_HELVETICA_18, ord(letter))
-                glEnable(GL_LIGHTING)
-        glPopMatrix()
+                    glut.glutBitmapCharacter(glut.GLUT_BITMAP_HELVETICA_18, ord(letter))
+                gl.glEnable(gl.GL_LIGHTING)
+        gl.glPopMatrix()
     
     def InitGL(self):
         # print "InitGL"
-        glMatrixMode(GL_PROJECTION)
-        glFrustum(-1.5, 1.5, -1.5, 1.5, 1, 100.0)
+        gl.glMatrixMode(gl.GL_PROJECTION)
+        gl.glFrustum(-1.5, 1.5, -1.5, 1.5, 1, 100.0)
         # print "width height near far offset", width, height, znear, zfar, self.offset
-        glEnable(GL_LIGHTING)
-        glEnable(GL_LIGHT0)
+        gl.glEnable(gl.GL_LIGHTING)
+        gl.glEnable(gl.GL_LIGHT0)
         # glLightfv( GL_LIGHT0, GL_AMBIENT, ( 0.5, 0.5, 0.5, 1.0 ) )
         # glLightfv( GL_LIGHT0, GL_AMBIENT, ( 1.0, 1.0, 1.0, 1.0 ) )
         # glLightfv( GL_LIGHT0, GL_POSITION, ( 0.0, 0.0, 0.0 ) )
@@ -389,27 +388,27 @@ class ColonyViewControl(ColonyViewBase):
         glLightfv( GL_LIGHT3, GL_SPOT_DIRECTION, ( 0.0, 0.0, -2.0 ) )
         """
         
-        glEnable(GL_COLOR_MATERIAL)
+        gl.glEnable(gl.GL_COLOR_MATERIAL)
         
         """ anti-aliasing """
-        glEnable(GL_LINE_SMOOTH)
-        glEnable(GL_POINT_SMOOTH)
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-        glHint(GL_LINE_SMOOTH_HINT, GL_DONT_CARE)
+        gl.glEnable(gl.GL_LINE_SMOOTH)
+        gl.glEnable(gl.GL_POINT_SMOOTH)
+        gl.glBlendFunc(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA)
+        gl.glHint(gl.GL_LINE_SMOOTH_HINT, gl.GL_DONT_CARE)
         
-        glClearColor(0.2, 0.2, 0.2, 1.0)  # set background color
-        glDepthFunc(GL_LESS)
-        glEnable(GL_DEPTH_TEST)
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        gl.glClearColor(0.2, 0.2, 0.2, 1.0)  # set background color
+        gl.glDepthFunc(gl.GL_LESS)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         
-        glMatrixMode(GL_MODELVIEW)
-        glLoadIdentity()
+        gl.glMatrixMode(gl.GL_MODELVIEW)
+        gl.glLoadIdentity()
         # gluLookAt( 0.0, 0.0, 50.0, 0.0, 0.0, -100.0, 0.0, 1.0, 0.0 )
         # gluLookAt( 0.0, 0.0, self.offset * -1.0, 0.0, 0.0, -50.0, 0.0, 1.0, 0.0 )
-        gluLookAt(0.0, 0.0, self.offset * -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
+        glu.gluLookAt(0.0, 0.0, self.offset * -1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0)
         # glTranslatef(0.0, 0.0, self.offset)
         # print "offset:", self.offset
-        glutInit(sys.argv)
+        glut.glutInit(sys.argv)
     
         # self.offset = -3 # z position
       
@@ -430,7 +429,7 @@ class ColonyViewControl(ColonyViewBase):
         # begin_time = clock()
         # print "begin draw", clock()
         # print 1/0
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         yangle = self.y - self.lasty + self.last_yangle
         xangle = (self.x - self.lastx) + self.last_xangle
         
@@ -451,7 +450,7 @@ class ColonyViewControl(ColonyViewBase):
             # print "on draw object", self.object
             
             for vertices in edges:
-                glColor3f(self.color.object_wireframe[0], self.color.object_wireframe[1], self.color.object_wireframe[2])
+                gl.glColor3f(self.color.object_wireframe[0], self.color.object_wireframe[1], self.color.object_wireframe[2])
                 # if self.dataset == None:
                 #  glColor3f( self.color.object_wireframe[0], self.color.object_wireframe[1], self.color.object_wireframe[2])
                 # else:

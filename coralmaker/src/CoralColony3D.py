@@ -9,16 +9,16 @@ Created on Mar 9, 2014
 @author: jikhanjung
 '''
 
-from CoralPolyp3D import CoralPolyp
-from CoralConfig3D import *
-import os
+#from CoralPolyp3D import CoralPolyp
+import CoralConfig3D as ccfg
+#import os
 import wx
-import sys
+#import sys
 #import random
-import math
-from numpy import *
-from opengltest import MdCanvas
-import Image, ImageDraw
+#import math
+from numpy import zeros
+#from opengltest import MdCanvas
+#import Image, ImageDraw
 
 class CoralColony():
     def __init__(self, depth = 1 ):
@@ -32,7 +32,7 @@ class CoralColony():
         self.lateral_growth_criterion = 0.01
         self.lateral_growth_period = 1 #month
         self.annual_shape = []
-        self.space = zeros( ( MAX_COLONY_SIZE, MAX_COLONY_SIZE) )
+        self.space = zeros( ( ccfg.MAX_COLONY_SIZE, ccfg.MAX_COLONY_SIZE) )
         self.occupied_space = []
         self.apical_polyp_list = []
         return
@@ -47,7 +47,7 @@ class CoralColony():
     def lateral_growth_check(self):
         polyp_count = len( self.polyp_list )
         #print "polyp_count:", self.prev_polyp_count, polyp_count
-        if self.config['peripheral_budding'] == ID_NONE:
+        if self.config['peripheral_budding'] == ccfg.ID_NONE:
             return
         if( float( polyp_count - self.prev_polyp_count ) / float( self.prev_polyp_count ) < self.config['lateral_growth_criterion'] ):
             self.head_polyp.grow_laterally()
@@ -58,12 +58,12 @@ class CoralColony():
     def record_annual_growth(self):
         p = self.head_polyp
         arr = []
-        pt = [ p.pos[X_INDEX], p.pos[Z_INDEX] * -1 ]
+        pt = [ p.pos[ccfg.X_INDEX], p.pos[ccfg.Z_INDEX] * -1 ]
         arr.append( pt)
         while p.next_polyp:
             p = p.next_polyp
             #p.record_position()
-            pt = [ p.pos[X_INDEX] , p.pos[Z_INDEX] * -1 ]
+            pt = [ p.pos[ccfg.X_INDEX] , p.pos[ccfg.Z_INDEX] * -1 ]
             arr.append( pt )
         self.annual_shape.append( arr )
 
@@ -166,8 +166,11 @@ class CoralColony():
                 color = "black"
             p.print_to_image( img, origin, color )
             #print p.pos
+    def dpring(self,a,b):
+        pass
     def print_to_dc(self, dc, origin ):
         w,h = dc.GetSize()
+        self.dprint( w, h )
         #print "dc size", w, h
         #origin = [ w / 2, h - 10 ]
         for shape in self.annual_shape:
