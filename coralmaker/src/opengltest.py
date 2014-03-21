@@ -211,8 +211,8 @@ class MdCanvasBase( glcanvas.GLCanvas ):
 class MdCanvas(MdCanvasBase):
 
   def DrawWire(self, yangle, xangle, vfrom, vto ):
-    lm1 = self.colony.corallites[vfrom - 1]
-    lm2 = self.colony.corallites[vto - 1]
+    lm1 = self.colony.polyp_list[vfrom - 1]
+    lm2 = self.colony.polyp_list[vto - 1]
     #print lm1.x, lm2.x
     axis_start = [0, 0, 1]
     axis_end = [lm1.pos[0]  - lm2.pos[0] , lm1.pos[1] - lm2.pos[1], lm1.pos[2] - lm2.pos[2] ]
@@ -283,7 +283,7 @@ class MdCanvas(MdCanvasBase):
       glDisable(GL_LIGHTING)
       glBegin( GL_POINTS )
 
-    for cr in colony.corallites:
+    for cr in colony.polyp_list:
       if cr.dead:
         #continue
         #glColor3f( self.color.selected_landmark[0], self.color.selected_landmark[1], self.color.selected_landmark[2] )
@@ -320,7 +320,7 @@ class MdCanvas(MdCanvasBase):
 
     if show_index:
       i = 0
-      for cr in colony.corallites:
+      for cr in colony.polyp_list:
         i+= 1
         if cr.dead: continue
         glDisable(GL_LIGHTING)
@@ -431,7 +431,7 @@ class MdCanvas(MdCanvasBase):
         #print vertices
         vfrom = int( vertices[0] )
         vto = int( vertices[1] )
-        if vfrom > len( self.colony.corallites ) or vto > len( self.colony.corallites ):
+        if vfrom > len( self.colony.polyp_list ) or vto > len( self.colony.polyp_list ):
           #print "out of bound"
           continue 
         #if self.print_log:
@@ -461,7 +461,7 @@ class MdCanvas(MdCanvasBase):
   def SetColony(self, colony ):
     #mo.move_to_center()
     self.colony = colony
-    if len( colony.corallites ) > 0 :
+    if len( colony.polyp_list ) > 0 :
       self.AdjustPerspective( self.colony )
     self.SetSize( self.GetClientSize() )
 
@@ -474,11 +474,11 @@ class MdCanvas(MdCanvasBase):
     #print "adjust perspective"
     #max_x, max_y, max_z, min_x, min_y, min_z = -999,-999,-999,999,999,999
     max_dist = 0
-    for i in range( len( co.corallites ) ):
-      for j in range(i+1,len(co.corallites)):
-        dist = math.sqrt( ( co.corallites[i].pos[0] - co.corallites[j].pos[0] ) ** 2 +
-                          ( co.corallites[i].pos[1] - co.corallites[j].pos[1] ) ** 2 +
-                          ( co.corallites[i].pos[2] - co.corallites[j].pos[2] ) ** 2   )
+    for i in range( len( co.polyp_list ) ):
+      for j in range(i+1,len(co.polyp_list)):
+        dist = math.sqrt( ( co.polyp_list[i].pos[0] - co.polyp_list[j].pos[0] ) ** 2 +
+                          ( co.polyp_list[i].pos[1] - co.polyp_list[j].pos[1] ) ** 2 +
+                          ( co.polyp_list[i].pos[2] - co.polyp_list[j].pos[2] ) ** 2   )
         max_dist = max( dist, max_dist )
     """      max_x = max( lm.xcoord, max_x )
       max_y = max( lm.ycoord, max_y )
@@ -504,7 +504,7 @@ class MdCanvas(MdCanvasBase):
     print "max dist", max_dist
     print "offset", self.offset
     #self.offset = -3 #max_diff * -2
-    self.lm_radius = max_dist / ( 4 * len( co.corallites) )
+    self.lm_radius = max_dist / ( 4 * len( co.polyp_list) )
     self.wire_radius = self.lm_radius / 2
 
 class OpenGLTestWin( wx.Dialog ):
