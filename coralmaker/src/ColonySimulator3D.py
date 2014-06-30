@@ -11,7 +11,7 @@ from ColonyViewer3D import ColonyViewControl
 import Image
 
 from CoralPolyp3D import CoralPolyp
-from CoralColony3D import CoralColony
+from CoralColony3D import CoralColony, CoralPolygon
 import CoralConfig3D 
 #from ColonyViewer3D import ColonyViewControl
 
@@ -264,14 +264,19 @@ class ColonySimulator3DFrame( wx.Frame ):
         #pos_list = [ [-5, 0, 3 ], [ 0, 0, 5 ], [5, 0, 3] ]
         #vec_list = [ array( [ -1, 0, 1 ], float ), array( [ 0, 0, 1 ], float ) ,  array( [ 1, 0, 1 ], float ) ]
 
-        pos_list = [ [-2, 0, 3 ], [2, 0, 3] ]
-        vec_list = [ array( [ -1, 0, 1 ], float ), array( [ 1, 0, 1 ], float ) ]
+        pos_list = [ [-2, 0, 3 ], [2, 0, 3], [ 0, 2, 3 ], [ 0, -2, 3 ] ]
+        vec_list = [ array( [ -1, 0, 1 ], float ), array( [ 1, 0, 1 ], float ), array( [ 0, 1, 1 ], float ), array( [ 0, -1, 1 ], float )   ]
+        tri_list = [ [ 0, 1, 2 ], [ 1, 0, 3 ] ]
         
         for i in xrange( len( pos_list ) ):
             p = CoralPolyp( self.colony, pos = array( pos_list[i], float ) )
             p.growth_vector = vec_list[i] / linalg.norm( vec_list[i] )
             self.colony.add_polyp( p )
-        
+
+        for i in xrange( len( tri_list ) ):
+            t = CoralPolygon( self.colony, tri_list[i] )
+            self.colony.add_polygon( t )
+
         """
         x_pos = [ -9, -5, 0, 5, 9 ]
         y_pos = [ 0, 0, 0, 0, 0 ]

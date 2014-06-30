@@ -107,7 +107,7 @@ class CoralPolyp():
         total_irradiance = floor_reflection + direct_irradiance
         self.irradiance = min( total_irradiance, self.colony.config['max_irradiance'] ) / self.colony.config['max_irradiance']
         return self.irradiance
-    
+
         if total_irradiance > self.colony.config['max_irradiance']:
             return 1
         else:

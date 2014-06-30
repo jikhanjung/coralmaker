@@ -231,7 +231,7 @@ class ColonyViewBase(glcanvas.GLCanvas):
             self.InitGL()
             self.init = True
         self.OnDraw()
-        print dc
+        #print dc
         
 class ColonyViewControl(ColonyViewBase):
 
@@ -530,8 +530,8 @@ class ColonyViewControl(ColonyViewBase):
         self.r = max_dist * 24
         self.offset = max_dist * -60.0
         # max_diff = max( max_x - min_x, max_y - min_y, max_z - min_z )
-        print "max dist", max_dist
-        print "offset", self.offset
+        #print "max dist", max_dist
+        #print "offset", self.offset
         # self.offset = -3 #max_diff * -2
         self.lm_radius = max_dist / (4 * len(co.polyp_list))
         self.wire_radius = self.lm_radius / 2

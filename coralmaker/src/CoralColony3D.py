@@ -16,15 +16,45 @@ import wx
 #import sys
 #import random
 #import math
-from numpy import zeros
+from numpy import zeros, cross, linalg
 #from opengltest import MdCanvas
 #import Image, ImageDraw
+
+class CoralPolygon():
+    def __init__( self, colony, polyp_list):
+        self.className="CoralPolygon"
+        self.polyp_idx = polyp_list
+        self.colony = colony
+
+    def get_area(self):
+        #print "area"
+        p1 = self.colony.polyp_list[self.polyp_idx[0]]
+        p2 = self.colony.polyp_list[self.polyp_idx[1]]
+        p3 = self.colony.polyp_list[self.polyp_idx[2]]
+        
+        v1 = p1.pos - p2.pos
+        v2 = p3.pos - p2.pos
+        
+        #print v1, v2
+        area = 0.5 * linalg.norm( cross( v1, v2 ) )
+        print "area of", self.polyp_idx, ":", area
+        return area
+    def has_enough_space_3d(self):
+        #print "space"
+        area = self.get_area()
+        if area > 20:
+            return True
+        return False
+        
+    def bud_3d(self):
+        pass
 
 class CoralColony():
     def __init__(self, depth = 1 ):
         self.className = "CoralColony"
         self.depth = depth
         self.polyp_list = []
+        self.polygon_list = []
         self.edges = []
         self.last_id = 0
         self.month = 0
@@ -43,7 +73,10 @@ class CoralColony():
         p.prev_pos[:] = p.pos[:]
         self.polyp_list.append( p )
         return
-    
+
+    def add_polygon(self,p):
+        self.polygon_list.append( p )
+
     def lateral_growth_check(self):
         polyp_count = len( self.polyp_list )
         #print "polyp_count:", self.prev_polyp_count, polyp_count
@@ -67,6 +100,9 @@ class CoralColony():
             arr.append( pt )
         self.annual_shape.append( arr )
 
+    def bud_3d(self,t):
+        pass
+
     def grow(self):
         #p = self.head_polyp
         #if self.month % 1 == 0:
@@ -76,7 +112,8 @@ class CoralColony():
         self.month += 1
         #print "lateral_growth_period:", self.config['lateral_growth_period']
         if self.month % self.config['lateral_growth_period'] == 0:
-            self.lateral_growth_check()
+            pass
+            #self.lateral_growth_check()
 
         if self.month % 12 == 0:
             self.record_annual_growth()
@@ -89,21 +126,27 @@ class CoralColony():
             if p.alive:
                 p.check_space()
 
-        
-        for p in self.polyp_list:
-            #print p.id, p.pos, len( self.polyp_list )
-            if p.alive:
-                if p.next_polyp:
-                    if p.has_enough_space_2d( p.next_polyp ):
-                        p.bud_2d( p.next_polyp )
+        #print "polygon"
+        for t in self.polygon_list:
+            #print t
+            if t.has_enough_space_3d():
+                self.bud_3d(t)
+                    
+        #for p in self.polyp_list:
+        #    if p.alive:
+        #        if p.next_polyp:
+        #            if p.has_enough_space_2d( p.next_polyp ):
+        #                p.bud_2d( p.next_polyp )
 
         for p in self.polyp_list:
             if p.alive:
-                p.calculate_new_growth_vector()
+                pass
+                #p.calculate_new_growth_vector()
 
         for p in self.polyp_list:
             if p.alive:
-                p.apply_new_growth_vector()
+                pass
+                #p.apply_new_growth_vector()
 
         for p in self.polyp_list:
             if p.alive:
