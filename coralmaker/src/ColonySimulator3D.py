@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 '''
 Created on Mar 6, 2014
 
@@ -40,11 +42,7 @@ class ColonySimulator3DFrame( wx.Frame ):
         #self.ColonyView.SetMinSize((800,700))
         self.PlayButton = wx.Button(self, wx.ID_ANY, 'Play')
         self.ResetButton = wx.Button(self, wx.ID_ANY, 'Reset')
-        #self.LoadNeighborButton = wx.Button(self, wx.ID_ANY, 'Watch')
-        #self.ButtonExport = wx.Button(self, wx.ID_ANY, 'Export')
-        #lb1 = wx.StaticText(self, wx.ID_ANY, '')
-        #lb2 = wx.StaticText(self, wx.ID_ANY, '')
-        
+
         self.determinategrowth_checkbox= wx.CheckBox( self, ID_DETERMINATEGROWTH_CHECKBOX, "Determinate growth" )
         self.Bind( wx.EVT_CHECKBOX, self.ToggleDeterminate, id=ID_DETERMINATEGROWTH_CHECKBOX)
         self.showskeleton_checkbox= wx.CheckBox( self, ID_SHOWSKELETON_CHECKBOX, "Show skeleton" )
@@ -53,11 +51,7 @@ class ColonySimulator3DFrame( wx.Frame ):
         self.Bind( wx.EVT_CHECKBOX, self.ToggleTimer, id=ID_TIMER_CHECKBOX)
         self.peripheralbudding_combobox= wx.ComboBox( self, ID_PERIPHERALBUDDING_COMBOBOX, "Peripheral budding", choices=[ "None", "Round", "Encrusting", "Platy" ] )
         self.Bind( wx.EVT_COMBOBOX, self.PeripheralBudding, id=ID_PERIPHERALBUDDING_COMBOBOX)
-        #self.chkShowIndex.SetValue( self.show_index)  
-        #self.chkEnhanceVerticalGrowth = wx.CheckBox( self, ID_CHK_ENHANCE_VERTICAL_GROWTH, "Enhance Vert. Growth" )
-        #self.Bind( wx.EVT_CHECKBOX, self.ToggleEnhanceVerticalGrowth, id=ID_CHK_ENHANCE_VERTICAL_GROWTH )
-        #self.chkEnhanceVerticalGrowth.SetValue( self.show_index)  
-        
+
         sizer1 = wx.BoxSizer(wx.HORIZONTAL)
         sizer1.Add( self.PlayButton , wx.ALIGN_CENTER   )
         sizer1.Add( self.ResetButton , wx.ALIGN_CENTER )

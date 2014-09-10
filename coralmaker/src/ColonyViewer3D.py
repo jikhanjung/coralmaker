@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 '''
 Created on Mar 18, 2014
 
@@ -14,7 +16,7 @@ from opengltest import MdCanvas
 
 #from CoralPolyp3D import CoralPolyp
 #from CoralColony3D import CoralColony
-#from CoralConfig3D import *
+#from CoralConfig3D import * 가나다라
 
 '''------'''
 
@@ -306,7 +308,7 @@ class ColonyViewControl(ColonyViewBase):
         #    single_object_mode = True
         if not single_object_mode:
             # print "point size, glbegin"
-            gl.glPointSize(3)
+            gl.glPointSize(5)
             gl.glDisable(gl.GL_LIGHTING)
             gl.glBegin(gl.GL_POINTS)
         
@@ -328,9 +330,9 @@ class ColonyViewControl(ColonyViewBase):
                 gl.glPushMatrix()
                 gl.glTranslate(cr.pos[0], cr.pos[1], cr.pos[2])
                 if cr.dead:
-                    glut.glutSolidSphere(0.2 , 20, 20)  # glutSolidCube( size )
+                    glut.glutSolidSphere(1 , 20, 20)  # glutSolidCube( size )
                 else:
-                    glut.glutSolidSphere(0.3, 20, 20)  # glutSolidCube( size )
+                    glut.glutSolidSphere(1, 20, 20)  # glutSolidCube( size )
                 
                 gl.glPopMatrix()
             else:
