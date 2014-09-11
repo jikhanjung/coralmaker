@@ -318,7 +318,7 @@ class ColonySimulator2DFrame(wx.Frame):
             self.GrowColony()
 
     def LoadList(self):
-
+        #test test
         self.polyp_listbox.Clear()
         h = self.colony.head_polyp
         self.polyp_listbox.Append(str(h.id), h)
