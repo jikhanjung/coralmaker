@@ -15,29 +15,29 @@ Y_INDEX = 1
 
 
 def rotate(vec, theta):
-	rotation_matrix = matrix([[math.cos(theta), 0, math.sin(theta)],
-	                          [0, 1, 0],
-	                          [-1 * math.sin(theta), 0, math.cos(theta)],
-	])
-	new_vec = dot(vec, rotation_matrix)
-	vec = squeeze(asarray(new_vec[0]))
-	return vec
+    rotation_matrix = matrix([[math.cos(theta), 0, math.sin(theta)],
+                              [0, 1, 0],
+                              [-1 * math.sin(theta), 0, math.cos(theta)],
+    ])
+    new_vec = dot(vec, rotation_matrix)
+    vec = squeeze(asarray(new_vec[0]))
+    return vec
 
 
 def get_angle_between_vectors(v1, v2):
-	cross_product = cross(v1, v2)
-	sin_theta = cross_product[Y_INDEX] / ( linalg.norm(v1) * linalg.norm(v2) )
-	print "sin_theta", sin_theta
-	# if sin_theta > 0:
-	#print "plus"
-	#else:
-	#print "minus"
-	theta = math.asin(sin_theta)
-	return theta
+    cross_product = cross(v1, v2)
+    sin_theta = cross_product[Y_INDEX] / ( linalg.norm(v1) * linalg.norm(v2) )
+    print "sin_theta", sin_theta
+    # if sin_theta > 0:
+    #print "plus"
+    #else:
+    #print "minus"
+    theta = math.asin(sin_theta)
+    return theta
 
 
 def radian_to_degree(radian):
-	return radian * 180 / math.pi
+    return radian * 180 / math.pi
 
 
 vec1 = [-9.3, 0, 16.9]
