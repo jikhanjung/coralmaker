@@ -316,7 +316,6 @@ class ColonySimulator2DFrame(wx.Frame):
                 self.PlayButton.SetLabel("Pause")
         else:
             self.GrowColony()
-        #    self.UpdateNeighborList( self.corallite_being_watched )
 
     def LoadList(self):
         #print "load list"
